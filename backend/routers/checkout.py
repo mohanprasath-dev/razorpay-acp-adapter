@@ -130,86 +130,87 @@ async def create_checkout_session(
 	3. Runs deterministic guardrail rule engine (max discount, max order value, max quantity).
 	4. Persists session and writes immutable AuditEntry for all checks (pass or reject).
 	"""
-	# Check Idempotency Key
-	if idempotency_key:
-		existing_session_id = get_idempotency_session_id(idempotency_key)
-		if existing_session_id:
-			existing_session = get_session_by_id(existing_session_id)
-			if existing_session:
-				return existing_session
+	with _idempotency_lock:
+		# Check Idempotency Key
+		if idempotency_key:
+			existing_session_id = get_idempotency_session_id(idempotency_key)
+			if existing_session_id:
+				existing_session = get_session_by_id(existing_session_id)
+				if existing_session:
+					return existing_session
 
-	if not request.line_items:
-		raise HTTPException(status_code=400, detail='line_items array cannot be empty.')
+		if not request.line_items:
+			raise HTTPException(status_code=400, detail='line_items array cannot be empty.')
 
-	discount_amount = request.discount or 0.0
+		discount_amount = request.discount or 0.0
 
-	# Compute authoritative totals and line items
-	raw_items = [item.model_dump() for item in request.line_items]
-	authoritative_items, totals = compute_authoritative_totals(
-		raw_items=raw_items,
-		discount_amount=discount_amount
-	)
-
-	session_id = f'cs_{uuid.uuid4().hex[:16]}'
-	now = datetime.now(timezone.utc)
-
-	# Evaluate Guardrails
-	passed, reject_reason = validate_guardrails(
-		line_items=authoritative_items,
-		totals=totals,
-		discount_amount=discount_amount
-	)
-
-	initial_status = SessionStatus.CREATED if passed else SessionStatus.REJECTED
-
-	session = CheckoutSession(
-		id=session_id,
-		status=initial_status,
-		line_items=authoritative_items,
-		buyer=request.buyer,
-		fulfillment_address=request.fulfillment_address,
-		totals=totals,
-		payment_provider=PaymentProvider(provider='razorpay', razorpay_order_id=None),
-		created_at=now,
-		updated_at=now
-	)
-
-	# Save session
-	save_session(session)
-
-	# Store idempotency key mapping
-	if idempotency_key:
-		save_idempotency_mapping(idempotency_key, session_id)
-
-	# Record audit log
-	if passed:
-		record_audit_entry(
-			session_id=session_id,
-			action=AuditAction.CREATE,
-			actor='buyer_agent_sim',
-			reason=None,
-			before_total=None,
-			after_total=totals.total
+		# Compute authoritative totals and line items
+		raw_items = [item.model_dump() for item in request.line_items]
+		authoritative_items, totals = compute_authoritative_totals(
+			raw_items=raw_items,
+			discount_amount=discount_amount
 		)
-		return session
-	else:
-		record_audit_entry(
-			session_id=session_id,
-			action=AuditAction.REJECT,
-			actor='buyer_agent_sim',
-			reason=reject_reason,
-			before_total=None,
-			after_total=totals.total
+
+		session_id = f'cs_{uuid.uuid4().hex[:16]}'
+		now = datetime.now(timezone.utc)
+
+		# Evaluate Guardrails
+		passed, reject_reason = validate_guardrails(
+			line_items=authoritative_items,
+			totals=totals,
+			discount_amount=discount_amount
 		)
-		raise HTTPException(
-			status_code=status.HTTP_400_BAD_REQUEST,
-			detail={
-				'error': 'guardrail_violation',
-				'reason': reject_reason,
-				'session_id': session_id,
-				'status': 'rejected'
-			}
+
+		initial_status = SessionStatus.CREATED if passed else SessionStatus.REJECTED
+
+		session = CheckoutSession(
+			id=session_id,
+			status=initial_status,
+			line_items=authoritative_items,
+			buyer=request.buyer,
+			fulfillment_address=request.fulfillment_address,
+			totals=totals,
+			payment_provider=PaymentProvider(provider='razorpay', razorpay_order_id=None),
+			created_at=now,
+			updated_at=now
 		)
+
+		# Save session
+		save_session(session)
+
+		# Store idempotency key mapping
+		if idempotency_key:
+			save_idempotency_mapping(idempotency_key, session_id)
+
+		# Record audit log
+		if passed:
+			record_audit_entry(
+				session_id=session_id,
+				action=AuditAction.CREATE,
+				actor='buyer_agent_sim',
+				reason=None,
+				before_total=None,
+				after_total=totals.total
+			)
+			return session
+		else:
+			record_audit_entry(
+				session_id=session_id,
+				action=AuditAction.REJECT,
+				actor='buyer_agent_sim',
+				reason=reject_reason,
+				before_total=None,
+				after_total=totals.total
+			)
+			raise HTTPException(
+				status_code=status.HTTP_400_BAD_REQUEST,
+				detail={
+					'error': 'guardrail_violation',
+					'reason': reject_reason,
+					'session_id': session_id,
+					'status': 'rejected'
+				}
+			)
 
 
 @router.get('/{session_id}', response_model=CheckoutSession, summary='Get Checkout Session')

@@ -13,6 +13,7 @@ from backend.models import (
 	AuditEntry,
 	Buyer,
 	CheckoutSession,
+	LineItem,
 	PaymentProvider,
 	SessionStatus,
 )

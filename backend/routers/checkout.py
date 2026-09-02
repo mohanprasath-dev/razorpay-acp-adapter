@@ -1,6 +1,7 @@
 """Checkout Session Router for Agentic Commerce Protocol (ACP).
-Handles creation, updating, retrieval, authoritative totals calculation, and session persistence.
+Handles creation, updating, retrieval, completion, authoritative totals calculation, and session persistence.
 """
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
@@ -16,7 +17,10 @@ from backend.models import (
 	SessionStatus,
 )
 from backend.services.pricing import compute_authoritative_totals
+from backend.services.razorpay_service import create_order
 from backend.db.firestore import get_firestore_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/checkout_sessions', tags=['Checkout Sessions'])
 
@@ -253,5 +257,83 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 		before_total=before_total,
 		after_total=totals.total
 	)
+
+	return session
+
+
+@router.post('/{session_id}/complete', response_model=CheckoutSession, summary='Complete Checkout Session')
+async def complete_checkout_session(session_id: str):
+	"""
+	Finalizes the checkout session:
+	1. Validates that the session is active (created or updated).
+	2. Creates a Razorpay Order scoped to the exact session total.
+	3. Transitions session status to 'completed' and records razorpay_order_id.
+	4. Logs immutable AuditEntry and fires simulated outbound webhook event.
+	"""
+	session = get_session_by_id(session_id)
+	if not session:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	if session.status == SessionStatus.COMPLETED:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Checkout session "{session_id}" is already completed with Razorpay order "{session.payment_provider.razorpay_order_id}".'
+		)
+
+	if session.status in [SessionStatus.REJECTED, SessionStatus.CANCELLED]:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Cannot complete checkout session "{session_id}" in terminal state "{session.status.value}".'
+		)
+
+	# Create real Razorpay test-mode Order scoped to total
+	try:
+		rzp_order = create_order(
+			amount=session.totals.total,
+			currency=session.totals.currency,
+			session_id=session.id
+		)
+	except Exception as exc:
+		logger.error(f'Failed to bridge to Razorpay Orders API for session {session_id}: {exc}')
+		raise HTTPException(
+			status_code=status.HTTP_502_BAD_GATEWAY,
+			detail=f'Failed to create payment rail order with Razorpay: {str(exc)}'
+		)
+
+	# Update session to completed state
+	now = datetime.now(timezone.utc)
+	session.payment_provider.razorpay_order_id = rzp_order['id']
+	session.status = SessionStatus.COMPLETED
+	session.updated_at = now
+
+	# Persist session
+	save_session(session)
+
+	# Record audit log
+	record_audit(
+		session_id=session_id,
+		action=AuditAction.COMPLETE,
+		actor='buyer_agent_sim',
+		before_total=session.totals.total,
+		after_total=session.totals.total
+	)
+
+	# Webhook outbound stub
+	webhook_payload = {
+		'event': 'checkout_session.completed',
+		'spec_version': '2026-04-17',
+		'timestamp': now.isoformat(),
+		'data': {
+			'session_id': session.id,
+			'status': 'completed',
+			'razorpay_order_id': rzp_order['id'],
+			'total': session.totals.total,
+			'currency': session.totals.currency
+		}
+	}
+	logger.info(f'[ACP Webhook Stub] Dispatched event: {webhook_payload}')
 
 	return session

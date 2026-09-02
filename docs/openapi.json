@@ -1,0 +1,1283 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Razorpay ACP Checkout Adapter",
+    "description": "Spec-compliant Agentic Commerce Protocol (ACP) checkout adapter backed by Razorpay",
+    "version": "2026-04-17"
+  },
+  "paths": {
+    "/.well-known/agent.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "ACP Agent Capability & Discovery Document",
+        "description": "Returns the unauthenticated Agentic Commerce Protocol (ACP) discovery document\nspecifying supported version, payment rails, and available endpoints.",
+        "operationId": "get_agent_discovery__well_known_agent_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Public Product Catalog Feed",
+        "description": "Returns the unauthenticated product catalog available for buyer agents.\nFetches from Firestore if available, otherwise falls back to the seeded in-memory/disk catalog.\nReflects live available stock.",
+        "operationId": "get_products_products_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Product"
+                  },
+                  "type": "array",
+                  "title": "Response Get Products Products Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout_sessions": {
+      "get": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "List All Checkout Sessions",
+        "description": "Lists all active and historical checkout sessions.",
+        "operationId": "list_checkout_sessions_checkout_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CheckoutSession"
+                  },
+                  "title": "Response List Checkout Sessions Checkout Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Create Checkout Session",
+        "description": "Creates a new ACP Checkout Session:\n1. Enforces idempotency via Idempotency-Key header.\n2. Computes authoritative pricing from server catalog.\n3. Validates inventory availability and deterministic guardrail rules.\n4. Persists session and writes immutable AuditEntry for all checks (pass or reject).\n5. Dispatches signed HMAC webhook event.",
+        "operationId": "create_checkout_session_checkout_sessions_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCheckoutSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout_sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Get Checkout Session",
+        "description": "Retrieves the current authoritative state of a checkout session.\nReturns HTTP 404 if the session ID does not exist.",
+        "operationId": "get_checkout_session_checkout_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Update Checkout Session",
+        "description": "Updates an existing checkout session with multi-turn cart negotiation support:\n- Supports partial line item patches: add item, change quantity, or remove item (quantity=0).\n- Supports applying, changing, or removing discounts (recalculating authoritative totals).\n- Re-validates inventory availability and guardrails on every turn.\n- Preserves session state on invalid negotiation proposals.",
+        "operationId": "update_checkout_session_checkout_sessions__session_id__post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCheckoutSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout_sessions/{session_id}/audit": {
+      "get": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Get Session Audit Trail",
+        "description": "Retrieves the chronological audit trail for a specific checkout session.",
+        "operationId": "get_session_audit_checkout_sessions__session_id__audit_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  },
+                  "title": "Response Get Session Audit Checkout Sessions  Session Id  Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout_sessions/{session_id}/payment_method": {
+      "post": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Attach Delegated Payment Method Token",
+        "description": "Attaches a delegated payment method token to the checkout session per ACP spec.\nValidates token format (pm_tok_...) or generates a stub token if not provided.\nTransitions session status to 'ready_for_payment' once buyer, address, items, and token are present.",
+        "operationId": "attach_payment_method_checkout_sessions__session_id__payment_method_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AttachPaymentMethodRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout_sessions/{session_id}/complete": {
+      "post": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Complete Checkout Session",
+        "description": "Finalizes the checkout session:\n1. Validates active status and attached payment method token.\n2. Atomically decrements catalog inventory.\n3. Creates Razorpay Order scoped to total.\n4. Transitions session to 'completed'.\n5. Logs AuditEntry and dispatches signed HMAC webhook event.",
+        "operationId": "complete_checkout_session_checkout_sessions__session_id__complete_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout_sessions/{session_id}/cancel": {
+      "post": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Cancel Checkout Session",
+        "description": "Cancels an incomplete checkout session.\nTransitions status to 'cancelled', records AuditEntry, and dispatches signed webhook.",
+        "operationId": "cancel_checkout_session_checkout_sessions__session_id__cancel_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout_sessions/{session_id}/refund": {
+      "post": {
+        "tags": [
+          "Checkout Sessions"
+        ],
+        "summary": "Refund Completed Checkout Session",
+        "description": "Executes a post-completion cancellation/refund on a finalized ACP session:\n1. Validates session is in 'completed' state with an active Razorpay Order.\n2. Bridges to Razorpay Refund API (client.payment.refund / create_refund).\n3. Transitions session to 'refunded' and records AuditAction.REFUND.\n4. Dispatches HMAC-signed 'checkout_session.refunded' webhook event.",
+        "operationId": "refund_checkout_session_checkout_sessions__session_id__refund_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefundCheckoutSessionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint to verify backend status.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit_entries": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Get Global Audit Trail",
+        "description": "Global immutable audit trail across all checkout sessions.",
+        "operationId": "get_global_audit_trail_audit_entries_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  },
+                  "type": "array",
+                  "title": "Response Get Global Audit Trail Audit Entries Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dead_letter_events": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Get All Dead Letter Events",
+        "description": "Lists all dead-lettered webhook dispatch events that failed after max retry attempts.",
+        "operationId": "get_all_dead_letter_events_dead_letter_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeadLetterEvent"
+                  },
+                  "type": "array",
+                  "title": "Response Get All Dead Letter Events Dead Letter Events Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Address": {
+        "properties": {
+          "line1": {
+            "type": "string",
+            "title": "Line1"
+          },
+          "line2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line2"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "postal_code": {
+            "type": "string",
+            "title": "Postal Code"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line1",
+          "city",
+          "state",
+          "postal_code",
+          "country"
+        ],
+        "title": "Address"
+      },
+      "AttachPaymentMethodRequest": {
+        "properties": {
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token",
+            "description": "ACP payment method token (e.g. pm_tok_<hex>)"
+          }
+        },
+        "type": "object",
+        "title": "AttachPaymentMethodRequest"
+      },
+      "AuditAction": {
+        "type": "string",
+        "enum": [
+          "create",
+          "update",
+          "complete",
+          "refund",
+          "reject",
+          "cancel",
+          "out_of_stock",
+          "attach_payment_method",
+          "flagged_anomalous"
+        ],
+        "title": "AuditAction"
+      },
+      "AuditEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "action": {
+            "$ref": "#/components/schemas/AuditAction"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": "buyer_agent_sim"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "before_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Total"
+          },
+          "after_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Total"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "action"
+        ],
+        "title": "AuditEntry"
+      },
+      "Buyer": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "Buyer"
+      },
+      "CheckoutSession": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          },
+          "line_items": {
+            "items": {
+              "$ref": "#/components/schemas/LineItem"
+            },
+            "type": "array",
+            "title": "Line Items"
+          },
+          "buyer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Buyer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fulfillment_address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
+          },
+          "payment_provider": {
+            "$ref": "#/components/schemas/PaymentProvider"
+          },
+          "payment_method_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method Token"
+          },
+          "is_anomalous": {
+            "type": "boolean",
+            "title": "Is Anomalous",
+            "default": false
+          },
+          "anomaly_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Score",
+            "default": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "totals"
+        ],
+        "title": "CheckoutSession"
+      },
+      "CreateCheckoutSessionRequest": {
+        "properties": {
+          "line_items": {
+            "items": {
+              "$ref": "#/components/schemas/RawLineItemInput"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Line Items",
+            "description": "List of items to purchase"
+          },
+          "buyer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Buyer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fulfillment_address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discount",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "line_items"
+        ],
+        "title": "CreateCheckoutSessionRequest"
+      },
+      "DeadLetterEvent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "target_url": {
+            "type": "string",
+            "title": "Target Url"
+          },
+          "last_error": {
+            "type": "string",
+            "title": "Last Error"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts",
+            "default": 3
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "event_type",
+          "target_url",
+          "last_error"
+        ],
+        "title": "DeadLetterEvent"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LineItem": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "description": "Quantity must be greater than zero"
+          },
+          "unit_price": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Unit Price",
+            "description": "Unit price must be non-negative"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "quantity",
+          "unit_price"
+        ],
+        "title": "LineItem"
+      },
+      "PaymentProvider": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "razorpay"
+          },
+          "razorpay_order_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Razorpay Order Id"
+          },
+          "refund_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Id"
+          }
+        },
+        "type": "object",
+        "title": "PaymentProvider"
+      },
+      "Product": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Price",
+            "description": "Price must be non-negative"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "title": "Currency",
+            "default": "INR"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Stock",
+            "description": "Available inventory stock quantity",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "price",
+          "description"
+        ],
+        "title": "Product"
+      },
+      "RawLineItemInput": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "default": 1
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id"
+        ],
+        "title": "RawLineItemInput"
+      },
+      "RawLineItemUpdateInput": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Quantity",
+            "description": "Quantity (0 removes item from cart)",
+            "default": 1
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id"
+        ],
+        "title": "RawLineItemUpdateInput"
+      },
+      "RefundCheckoutSessionRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Reason for refund",
+            "default": "Buyer requested post-completion refund"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount",
+            "description": "Refund amount; defaults to full session total"
+          }
+        },
+        "type": "object",
+        "title": "RefundCheckoutSessionRequest"
+      },
+      "SessionStatus": {
+        "type": "string",
+        "enum": [
+          "created",
+          "updated",
+          "ready_for_payment",
+          "completed",
+          "refunded",
+          "rejected",
+          "cancelled"
+        ],
+        "title": "SessionStatus"
+      },
+      "Totals": {
+        "properties": {
+          "subtotal": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Subtotal",
+            "description": "Subtotal must be non-negative"
+          },
+          "discount": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Discount",
+            "description": "Discount must be non-negative",
+            "default": 0.0
+          },
+          "tax": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Tax",
+            "description": "Tax must be non-negative",
+            "default": 0.0
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total must be non-negative"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "title": "Currency",
+            "description": "ISO 4217 3-letter currency code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subtotal",
+          "total",
+          "currency"
+        ],
+        "title": "Totals"
+      },
+      "UpdateCheckoutSessionRequest": {
+        "properties": {
+          "line_items": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RawLineItemUpdateInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Items",
+            "description": "Updated or patched line items"
+          },
+          "buyer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Buyer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fulfillment_address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discount"
+          }
+        },
+        "type": "object",
+        "title": "UpdateCheckoutSessionRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

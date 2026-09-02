@@ -1,0 +1,23 @@
+{
+  "id": "T9.2",
+  "day": 9,
+  "title": "Public repo cleanup and final QA",
+  "model": "gemini-flash",
+  "context": "Repo will be submitted as a public GitHub URL per the application form requirements.",
+  "objective": "Make the repo submission-ready: no secrets, clear license, working .env.example, clean commit history.",
+  "scope_in": [
+    "Secret-scan the full repo and git history, remove/rotate anything found",
+    "Add LICENSE (MIT, per your usual default unless you want otherwise)",
+    ".env.example lists every required var with placeholder values, no real keys",
+    "Run the work-review skill against the finished build for a final gap check"
+  ],
+  "scope_out": [],
+  "acceptance_criteria": [
+    "Secret scan (e.g. git-secrets or manual grep for key patterns) returns clean",
+    "A fresh clone of the repo, following only the README, boots successfully",
+    "work-review pass completed, any flagged gaps addressed or consciously accepted"
+  ],
+  "files_expected": [
+    "LICENSE"
+  ]
+}

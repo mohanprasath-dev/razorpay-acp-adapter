@@ -1,0 +1,22 @@
+{
+  "id": "T7.1",
+  "day": 7,
+  "title": "Deliberate failure path for the live demo",
+  "model": "gemini-flash",
+  "context": "This is the 'one failure handled gracefully' requirement from the track brief. Must be demo-able live and deterministic.",
+  "objective": "Add a second mode to the buyer-agent simulator that deliberately requests something over-bound (e.g. discount above max), and confirm the API rejects it gracefully with the T5.2 guardrail engine.",
+  "scope_in": [
+    "buyer_agent_sim.py --scenario=violation flag or similar, triggering an over-bound request",
+    "Confirm the response is a clean structured rejection (from T5.2), not a crash or unhandled exception",
+    "Confirm the AuditEntry for the rejection is visible and readable"
+  ],
+  "scope_out": [],
+  "acceptance_criteria": [
+    "Running the violation scenario produces a clean, readable rejection message, no stack trace or 500 error",
+    "The corresponding AuditEntry in Firestore has a clear, specific reason string",
+    "This scenario is rehearsed and reliable enough to run live during the pitch video without retries"
+  ],
+  "files_expected": [
+    "backend/scripts/buyer_agent_sim.py (extended)"
+  ]
+}

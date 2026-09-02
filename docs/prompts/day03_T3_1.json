@@ -1,0 +1,30 @@
+{
+  "id": "T3.1",
+  "day": 3,
+  "title": "POST /checkout_sessions \u2014 create session",
+  "model": "claude-opus",
+  "context": "This is the highest-correctness-risk endpoint \u2014 totals math and cart authority. Escalate to Opus directly given prior notes on totals/guardrail logic risk.",
+  "objective": "Implement session creation per ACP spec: accept line_items (required), buyer (optional), fulfillment_address (optional); return an authoritative cart with computed totals.",
+  "scope_in": [
+    "POST /checkout_sessions accepting the request shape from PRD \u00a75.2",
+    "Server-side price lookup from catalog \u2014 never trust a client-supplied price",
+    "Totals computation: subtotal, tax (flat placeholder rate, documented), total",
+    "Response includes payment_provider block with provider=razorpay, razorpay_order_id=null (not yet created)",
+    "Session persisted to Firestore with status=created",
+    "Idempotency-Key header support: same key within a time window returns the existing session, does not create a duplicate"
+  ],
+  "scope_out": [
+    "No update/complete logic yet \u2014 creation only"
+  ],
+  "acceptance_criteria": [
+    "POST with a valid line_items array returns HTTP 201 and a session with correct computed totals",
+    "POST with an empty line_items array returns HTTP 400 with a clear error message",
+    "POST with a client-supplied price different from catalog price ignores the client price and uses server-side catalog price",
+    "Sending the same Idempotency-Key twice returns the same session id both times, confirmed via a test hitting the endpoint twice",
+    "Session document appears in Firestore with status=created"
+  ],
+  "files_expected": [
+    "backend/routers/checkout.py",
+    "backend/services/pricing.py"
+  ]
+}

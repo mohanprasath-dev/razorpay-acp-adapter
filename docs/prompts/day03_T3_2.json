@@ -1,0 +1,26 @@
+{
+  "id": "T3.2",
+  "day": 3,
+  "title": "Update and Get checkout session \u2014 DAY 3 SUBMISSION CHECKPOINT",
+  "model": "gemini-flash",
+  "context": "This task closes out the minimum submittable MVP for the Sept 5 deadline. Everything from T1-T3 must work end-to-end after this task.",
+  "objective": "Implement POST /checkout_sessions/{id} (update) and GET /checkout_sessions/{id} (fetch).",
+  "scope_in": [
+    "POST /checkout_sessions/{id} accepting partial updates (line item changes, shipping address, discount code)",
+    "Recompute totals on every update, return full refreshed cart state",
+    "GET /checkout_sessions/{id} returns current state, 404 if session doesn't exist",
+    "Status transitions to updated on any successful update"
+  ],
+  "scope_out": [
+    "No complete/cancel logic yet \u2014 those are Day 4-5"
+  ],
+  "acceptance_criteria": [
+    "Update changing quantity of one line item returns correctly recomputed totals",
+    "GET on a nonexistent session id returns HTTP 404 with a clear error, not a 500",
+    "GET immediately after an update reflects the updated state, not stale data",
+    "FULL MVP CHECK: run create -> update -> get in sequence via curl or a short script, confirm state is consistent at every step \u2014 this is your submission-readiness gate"
+  ],
+  "files_expected": [
+    "backend/routers/checkout.py (extended)"
+  ]
+}

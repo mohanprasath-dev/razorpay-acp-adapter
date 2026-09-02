@@ -1,0 +1,21 @@
+{
+  "id": "T7.2",
+  "day": 7,
+  "title": "Idempotency-Key hardening",
+  "model": "gemini-flash",
+  "context": "Idempotency was scoped into T3.1 but needs a dedicated hardening + test pass given it's explicitly listed as a non-functional requirement in the PRD.",
+  "objective": "Confirm and harden idempotency behavior on POST /checkout_sessions under concurrent/duplicate calls.",
+  "scope_in": [
+    "Test sending the same Idempotency-Key twice in quick succession (simulating a retry)",
+    "Confirm no duplicate session or duplicate Razorpay order is ever created"
+  ],
+  "scope_out": [],
+  "acceptance_criteria": [
+    "Two rapid POSTs with the same Idempotency-Key return the same session id",
+    "No duplicate Firestore document is created",
+    "Test covers this explicitly, not just manual spot-check"
+  ],
+  "files_expected": [
+    "backend/tests/test_idempotency.py"
+  ]
+}

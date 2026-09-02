@@ -1,0 +1,24 @@
+{
+  "id": "T9.1",
+  "day": 9,
+  "title": "README, architecture diagram, PROJECT_MAP",
+  "model": "gemini-flash",
+  "context": "Run the existing /understand-app Antigravity workflow per your established practice, post-completion only.",
+  "objective": "Produce documentation a stranger (or a judge) can read cold and understand the system in under 10 minutes.",
+  "scope_in": [
+    "README.md: what this is, why ACP, architecture overview, how to run it, live demo links",
+    "Architecture diagram (can be a simple text/mermaid diagram) showing the checkout session flow and where Razorpay sits",
+    "Run /understand-app to generate docs/PROJECT_MAP.md, flagging any [NEEDS INPUT] items"
+  ],
+  "scope_out": [],
+  "acceptance_criteria": [
+    "README explains the deliberate ACP-Razorpay payment bridge adaptation clearly, not glossed over",
+    "docs/PROJECT_MAP.md exists and answers 'how does checkout completion work' without needing to read source code",
+    "Any [NEEDS INPUT] flags in PROJECT_MAP are resolved or explicitly noted as known gaps"
+  ],
+  "files_expected": [
+    "README.md",
+    "docs/PROJECT_MAP.md",
+    "docs/architecture.md"
+  ]
+}

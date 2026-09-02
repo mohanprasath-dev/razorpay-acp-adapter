@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import get_settings
-from backend.routers import discovery
+from backend.routers import discovery, checkout
 
 settings = get_settings()
 
@@ -23,6 +23,7 @@ app.add_middleware(
 
 # Include Routers
 app.include_router(discovery.router)
+app.include_router(checkout.router)
 
 
 @app.get('/health', tags=['Health'])

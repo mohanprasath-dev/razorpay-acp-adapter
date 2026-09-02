@@ -1,5 +1,5 @@
 """Checkout Session Router for Agentic Commerce Protocol (ACP).
-Handles creation, authoritative totals calculation, and session persistence.
+Handles creation, updating, retrieval, authoritative totals calculation, and session persistence.
 """
 import uuid
 from datetime import datetime, timezone
@@ -37,6 +37,13 @@ class CreateCheckoutSessionRequest(BaseModel):
 	buyer: Optional[Buyer] = None
 	fulfillment_address: Optional[Address] = None
 	discount: Optional[float] = Field(default=0.0, ge=0.0)
+
+
+class UpdateCheckoutSessionRequest(BaseModel):
+	line_items: Optional[List[RawLineItemInput]] = Field(default=None, description='Updated list of line items')
+	buyer: Optional[Buyer] = None
+	fulfillment_address: Optional[Address] = None
+	discount: Optional[float] = Field(default=None, ge=0.0)
 
 
 def save_session(session: CheckoutSession):
@@ -157,6 +164,93 @@ async def create_checkout_session(
 		action=AuditAction.CREATE,
 		actor='buyer_agent_sim',
 		before_total=None,
+		after_total=totals.total
+	)
+
+	return session
+
+
+@router.get('/{session_id}', response_model=CheckoutSession, summary='Get Checkout Session')
+async def get_checkout_session(session_id: str):
+	"""
+	Retrieves the current authoritative state of a checkout session.
+	Returns HTTP 404 if the session ID does not exist.
+	"""
+	session = get_session_by_id(session_id)
+	if not session:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+	return session
+
+
+@router.post('/{session_id}', response_model=CheckoutSession, summary='Update Checkout Session')
+async def update_checkout_session(session_id: str, request: UpdateCheckoutSessionRequest):
+	"""
+	Updates an existing checkout session with line item modifications, shipping address,
+	or discounts. Recomputes authoritative totals and marks status as 'updated'.
+	"""
+	session = get_session_by_id(session_id)
+	if not session:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	if session.status in [SessionStatus.COMPLETED, SessionStatus.REJECTED, SessionStatus.CANCELLED]:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Cannot update session "{session_id}" in terminal state "{session.status.value}".'
+		)
+
+	before_total = session.totals.total
+
+	# Handle line item or discount updates with authoritative pricing
+	new_line_items = session.line_items
+	new_discount = request.discount if request.discount is not None else session.totals.discount
+
+	if request.line_items is not None:
+		if len(request.line_items) == 0:
+			raise HTTPException(status_code=400, detail='line_items array cannot be empty on update.')
+		raw_items = [item.model_dump() for item in request.line_items]
+		authoritative_items, totals = compute_authoritative_totals(
+			raw_items=raw_items,
+			discount_amount=new_discount
+		)
+		new_line_items = authoritative_items
+	elif request.discount is not None:
+		# Recalculate totals for existing items with new discount
+		raw_items = [{'product_id': item.product_id, 'quantity': item.quantity} for item in session.line_items]
+		_, totals = compute_authoritative_totals(
+			raw_items=raw_items,
+			discount_amount=new_discount
+		)
+	else:
+		totals = session.totals
+
+	# Update buyer & address if supplied
+	new_buyer = request.buyer if request.buyer is not None else session.buyer
+	new_address = request.fulfillment_address if request.fulfillment_address is not None else session.fulfillment_address
+
+	# Refresh session object
+	now = datetime.now(timezone.utc)
+	session.line_items = new_line_items
+	session.buyer = new_buyer
+	session.fulfillment_address = new_address
+	session.totals = totals
+	session.status = SessionStatus.UPDATED
+	session.updated_at = now
+
+	# Persist update
+	save_session(session)
+
+	# Record audit log
+	record_audit(
+		session_id=session_id,
+		action=AuditAction.UPDATE,
+		actor='buyer_agent_sim',
+		before_total=before_total,
 		after_total=totals.total
 	)
 

@@ -82,9 +82,22 @@ async def get_agent_discovery():
 	}
 
 
+from backend.db.firestore import get_firestore_client
+
 @router.get('/products', response_model=List[Product], summary='Public Product Catalog Feed')
 async def get_products():
 	"""
 	Returns the unauthenticated product catalog available for buyer agents.
+	Fetches from Firestore if available, otherwise falls back to the seeded in-memory/disk catalog.
 	"""
+	db = get_firestore_client()
+	if db is not None:
+		try:
+			docs = db.collection('products').stream()
+			products = [Product(**doc.to_dict()) for doc in docs]
+			if products:
+				return products
+		except Exception:
+			pass
+
 	return CATALOG

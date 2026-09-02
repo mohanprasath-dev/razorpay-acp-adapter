@@ -1,0 +1,37 @@
+[
+  {
+    "id": "prod_bolt_001",
+    "name": "Autonomous Agent Run Credit (100k Tokens)",
+    "price": 499.0,
+    "currency": "INR",
+    "description": "High-throughput inference credit package for AI agent execution workflows."
+  },
+  {
+    "id": "prod_bolt_002",
+    "name": "TaskDrift Pro Website Audit & Optimization",
+    "price": 4999.0,
+    "currency": "INR",
+    "description": "Comprehensive Lighthouse, SEO, and Three.js performance tuning package."
+  },
+  {
+    "id": "prod_bolt_003",
+    "name": "Custom GLSL Shader & WebGL Experience Pack",
+    "price": 9999.0,
+    "currency": "INR",
+    "description": "Production-ready custom procedural shaders, bloom filters, and particle system bundle."
+  },
+  {
+    "id": "prod_bolt_004",
+    "name": "Razorpay Gateway Integration & Webhook Kit",
+    "price": 2499.0,
+    "currency": "INR",
+    "description": "Enterprise payment rail bridge with backoff retry and idempotent order handlers."
+  },
+  {
+    "id": "prod_bolt_005",
+    "name": "AI Commerce Agent Protocol Adapter License",
+    "price": 14999.0,
+    "currency": "INR",
+    "description": "Full commercial deployment license for ACP-compliant bounded checkout adapter."
+  }
+]

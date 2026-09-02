@@ -256,3 +256,39 @@ def test_cancel_already_cancelled_session_fails():
 	repeat_res = client.post(f'/checkout_sessions/{session_id}/cancel')
 	assert repeat_res.status_code == 409
 	assert 'already cancelled' in repeat_res.json()['detail'].lower()
+
+
+def test_list_checkout_sessions():
+	create_res = client.post('/checkout_sessions', json={
+		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
+	})
+	session_id = create_res.json()['id']
+
+	list_res = client.get('/checkout_sessions')
+	assert list_res.status_code == 200
+	sessions = list_res.json()
+	assert isinstance(sessions, list)
+	assert any(s['id'] == session_id for s in sessions)
+
+
+def test_get_session_audit_trail_and_global_audit():
+	create_res = client.post('/checkout_sessions', json={
+		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
+	})
+	session_id = create_res.json()['id']
+	client.post(f'/checkout_sessions/{session_id}/cancel')
+
+	# Session audit
+	audit_res = client.get(f'/checkout_sessions/{session_id}/audit')
+	assert audit_res.status_code == 200
+	entries = audit_res.json()
+	assert len(entries) >= 2
+	actions = [e['action'] for e in entries]
+	assert 'create' in actions
+	assert 'cancel' in actions
+
+	# Global audit
+	global_res = client.get('/audit_entries')
+	assert global_res.status_code == 200
+	global_entries = global_res.json()
+	assert any(e['session_id'] == session_id for e in global_entries)

@@ -45,13 +45,28 @@ def record_audit_entry(
 
 
 def get_all_audit_entries() -> List[AuditEntry]:
-	"""Retrieves all recorded audit entries."""
-	return list(_audit_log_store)
+	"""Retrieves all recorded audit entries sorted chronologically."""
+	entries_map = {e.id: e for e in _audit_log_store}
+	db = get_firestore_client()
+	if db is not None:
+		try:
+			docs = db.collection('audit_entries').stream()
+			for doc in docs:
+				data = doc.to_dict()
+				entry = AuditEntry(**data)
+				entries_map[entry.id] = entry
+		except Exception:
+			pass
+	entries = list(entries_map.values())
+	entries.sort(key=lambda x: x.timestamp)
+	return entries
 
 
 def get_session_audit_entries(session_id: str) -> List[AuditEntry]:
-	"""Retrieves all audit entries for a specific checkout session."""
-	return [e for e in _audit_log_store if e.session_id == session_id]
+	"""Retrieves all audit entries for a specific checkout session in chronological order."""
+	entries = [e for e in get_all_audit_entries() if e.session_id == session_id]
+	entries.sort(key=lambda x: x.timestamp)
+	return entries
 
 
 def clear_audit_entries_for_test():

@@ -118,6 +118,30 @@ def save_idempotency_mapping(key: str, session_id: str):
 			pass
 
 
+def get_all_sessions() -> List[CheckoutSession]:
+	"""Retrieves all sessions from in-memory store and Firestore sorted by created_at descending."""
+	sessions_map = dict(_sessions_store)
+	db = get_firestore_client()
+	if db is not None:
+		try:
+			docs = db.collection('checkout_sessions').stream()
+			for doc in docs:
+				data = doc.to_dict()
+				session = CheckoutSession(**data)
+				sessions_map[session.id] = session
+		except Exception:
+			pass
+	sessions = list(sessions_map.values())
+	sessions.sort(key=lambda x: x.created_at, reverse=True)
+	return sessions
+
+
+@router.get('', response_model=List[CheckoutSession], summary='List All Checkout Sessions')
+async def list_checkout_sessions():
+	"""Lists all active and historical checkout sessions."""
+	return get_all_sessions()
+
+
 @router.post('', status_code=status.HTTP_201_CREATED, response_model=CheckoutSession, summary='Create Checkout Session')
 async def create_checkout_session(
 	request: CreateCheckoutSessionRequest,
@@ -226,6 +250,19 @@ async def get_checkout_session(session_id: str):
 			detail=f'Checkout session with id "{session_id}" was not found.'
 		)
 	return session
+
+
+@router.get('/{session_id}/audit', response_model=List[AuditEntry], summary='Get Session Audit Trail')
+async def get_session_audit(session_id: str):
+	"""Retrieves the chronological audit trail for a specific checkout session."""
+	session = get_session_by_id(session_id)
+	entries = get_session_audit_entries(session_id)
+	if not session and not entries:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+	return entries
 
 
 @router.post('/{session_id}', response_model=CheckoutSession, summary='Update Checkout Session')

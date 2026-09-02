@@ -10,6 +10,7 @@ class SessionStatus(str, Enum):
 	UPDATED = 'updated'
 	READY_FOR_PAYMENT = 'ready_for_payment'
 	COMPLETED = 'completed'
+	REFUNDED = 'refunded'
 	REJECTED = 'rejected'
 	CANCELLED = 'cancelled'
 
@@ -18,6 +19,7 @@ class AuditAction(str, Enum):
 	CREATE = 'create'
 	UPDATE = 'update'
 	COMPLETE = 'complete'
+	REFUND = 'refund'
 	REJECT = 'reject'
 	CANCEL = 'cancel'
 
@@ -70,6 +72,7 @@ class Totals(BaseModel):
 class PaymentProvider(BaseModel):
 	provider: str = 'razorpay'
 	razorpay_order_id: Optional[str] = None
+	refund_id: Optional[str] = None
 
 
 class CheckoutSession(BaseModel):

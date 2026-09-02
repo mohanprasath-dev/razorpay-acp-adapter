@@ -5,7 +5,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from backend.models import (
 	Address,
@@ -18,8 +18,10 @@ from backend.models import (
 )
 from backend.services.pricing import compute_authoritative_totals
 from backend.services.guardrails import validate_guardrails
-from backend.services.razorpay_service import create_order
+from backend.services.razorpay_service import create_order, create_refund
 from backend.services.audit import record_audit_entry, get_all_audit_entries, get_session_audit_entries
+from backend.services.webhook import dispatch_webhook_event
+from backend.services.rate_limiter import rate_limit_dependency
 from backend.db.firestore import get_firestore_client
 
 import threading
@@ -52,6 +54,11 @@ class UpdateCheckoutSessionRequest(BaseModel):
 	buyer: Optional[Buyer] = None
 	fulfillment_address: Optional[Address] = None
 	discount: Optional[float] = Field(default=None, ge=0.0)
+
+
+class RefundCheckoutSessionRequest(BaseModel):
+	reason: Optional[str] = Field(default='Buyer requested post-completion refund', description='Reason for refund')
+	amount: Optional[float] = Field(default=None, gt=0.0, description='Refund amount; defaults to full session total')
 
 
 def save_session(session: CheckoutSession):
@@ -142,7 +149,13 @@ async def list_checkout_sessions():
 	return get_all_sessions()
 
 
-@router.post('', status_code=status.HTTP_201_CREATED, response_model=CheckoutSession, summary='Create Checkout Session')
+@router.post(
+	'',
+	status_code=status.HTTP_201_CREATED,
+	response_model=CheckoutSession,
+	dependencies=[Depends(rate_limit_dependency)],
+	summary='Create Checkout Session'
+)
 async def create_checkout_session(
 	request: CreateCheckoutSessionRequest,
 	idempotency_key: Optional[str] = Header(default=None, alias='Idempotency-Key')
@@ -153,6 +166,7 @@ async def create_checkout_session(
 	2. Computes authoritative pricing from server catalog.
 	3. Runs deterministic guardrail rule engine (max discount, max order value, max quantity).
 	4. Persists session and writes immutable AuditEntry for all checks (pass or reject).
+	5. Dispatches signed HMAC webhook event.
 	"""
 	with _idempotency_lock:
 		# Check Idempotency Key
@@ -206,7 +220,7 @@ async def create_checkout_session(
 		if idempotency_key:
 			save_idempotency_mapping(idempotency_key, session_id)
 
-		# Record audit log
+		# Record audit log & dispatch webhooks
 		if passed:
 			record_audit_entry(
 				session_id=session_id,
@@ -216,6 +230,7 @@ async def create_checkout_session(
 				before_total=None,
 				after_total=totals.total
 			)
+			dispatch_webhook_event('checkout_session.created', session.model_dump(mode='json'))
 			return session
 		else:
 			record_audit_entry(
@@ -226,6 +241,11 @@ async def create_checkout_session(
 				before_total=None,
 				after_total=totals.total
 			)
+			dispatch_webhook_event('checkout_session.rejected', {
+				'session_id': session_id,
+				'reason': reject_reason,
+				'totals': totals.model_dump(mode='json')
+			})
 			raise HTTPException(
 				status_code=status.HTTP_400_BAD_REQUEST,
 				detail={
@@ -265,7 +285,12 @@ async def get_session_audit(session_id: str):
 	return entries
 
 
-@router.post('/{session_id}', response_model=CheckoutSession, summary='Update Checkout Session')
+@router.post(
+	'/{session_id}',
+	response_model=CheckoutSession,
+	dependencies=[Depends(rate_limit_dependency)],
+	summary='Update Checkout Session'
+)
 async def update_checkout_session(session_id: str, request: UpdateCheckoutSessionRequest):
 	"""
 	Updates an existing checkout session.
@@ -366,14 +391,19 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 	return session
 
 
-@router.post('/{session_id}/complete', response_model=CheckoutSession, summary='Complete Checkout Session')
+@router.post(
+	'/{session_id}/complete',
+	response_model=CheckoutSession,
+	dependencies=[Depends(rate_limit_dependency)],
+	summary='Complete Checkout Session'
+)
 async def complete_checkout_session(session_id: str):
 	"""
 	Finalizes the checkout session:
 	1. Validates active status.
 	2. Creates Razorpay Order scoped to total.
 	3. Transitions session to 'completed'.
-	4. Logs AuditEntry and dispatches webhook event.
+	4. Logs AuditEntry and dispatches signed HMAC webhook event.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -388,7 +418,7 @@ async def complete_checkout_session(session_id: str):
 			detail=f'Checkout session "{session_id}" is already completed with Razorpay order "{session.payment_provider.razorpay_order_id}".'
 		)
 
-	if session.status in [SessionStatus.REJECTED, SessionStatus.CANCELLED]:
+	if session.status in [SessionStatus.REJECTED, SessionStatus.CANCELLED, SessionStatus.REFUNDED]:
 		raise HTTPException(
 			status_code=status.HTTP_400_BAD_REQUEST,
 			detail=f'Cannot complete checkout session "{session_id}" in terminal state "{session.status.value}".'
@@ -423,29 +453,28 @@ async def complete_checkout_session(session_id: str):
 		after_total=session.totals.total
 	)
 
-	# Webhook outbound stub
-	webhook_payload = {
-		'event': 'checkout_session.completed',
-		'spec_version': '2026-04-17',
-		'timestamp': now.isoformat(),
-		'data': {
-			'session_id': session.id,
-			'status': 'completed',
-			'razorpay_order_id': rzp_order['id'],
-			'total': session.totals.total,
-			'currency': session.totals.currency
-		}
-	}
-	logger.info(f'[ACP Webhook Stub] Dispatched event: {webhook_payload}')
+	# Outbound HMAC-signed webhook event
+	dispatch_webhook_event('checkout_session.completed', {
+		'session_id': session.id,
+		'status': 'completed',
+		'razorpay_order_id': rzp_order['id'],
+		'total': session.totals.total,
+		'currency': session.totals.currency
+	})
 
 	return session
 
 
-@router.post('/{session_id}/cancel', response_model=CheckoutSession, summary='Cancel Checkout Session')
+@router.post(
+	'/{session_id}/cancel',
+	response_model=CheckoutSession,
+	dependencies=[Depends(rate_limit_dependency)],
+	summary='Cancel Checkout Session'
+)
 async def cancel_checkout_session(session_id: str):
 	"""
 	Cancels an incomplete checkout session.
-	Transitions status to 'cancelled' and records AuditEntry.
+	Transitions status to 'cancelled', records AuditEntry, and dispatches signed webhook.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -457,7 +486,7 @@ async def cancel_checkout_session(session_id: str):
 	if session.status == SessionStatus.COMPLETED:
 		raise HTTPException(
 			status_code=status.HTTP_409_CONFLICT,
-			detail=f'Cannot cancel checkout session "{session_id}" because it is already completed with Razorpay order "{session.payment_provider.razorpay_order_id}".'
+			detail=f'Cannot cancel checkout session "{session_id}" because it is already completed with Razorpay order "{session.payment_provider.razorpay_order_id}". Use /refund endpoint.'
 		)
 
 	if session.status == SessionStatus.CANCELLED:
@@ -466,10 +495,10 @@ async def cancel_checkout_session(session_id: str):
 			detail=f'Checkout session "{session_id}" is already cancelled.'
 		)
 
-	if session.status == SessionStatus.REJECTED:
+	if session.status in [SessionStatus.REJECTED, SessionStatus.REFUNDED]:
 		raise HTTPException(
 			status_code=status.HTTP_400_BAD_REQUEST,
-			detail=f'Cannot cancel checkout session "{session_id}" in rejected state.'
+			detail=f'Cannot cancel checkout session "{session_id}" in terminal state "{session.status.value}".'
 		)
 
 	now = datetime.now(timezone.utc)
@@ -486,4 +515,94 @@ async def cancel_checkout_session(session_id: str):
 		after_total=session.totals.total
 	)
 
+	dispatch_webhook_event('checkout_session.cancelled', {
+		'session_id': session.id,
+		'status': 'cancelled'
+	})
+
 	return session
+
+
+@router.post(
+	'/{session_id}/refund',
+	response_model=CheckoutSession,
+	dependencies=[Depends(rate_limit_dependency)],
+	summary='Refund Completed Checkout Session'
+)
+async def refund_checkout_session(session_id: str, request: Optional[RefundCheckoutSessionRequest] = None):
+	"""
+	Executes a post-completion cancellation/refund on a finalized ACP session:
+	1. Validates session is in 'completed' state with an active Razorpay Order.
+	2. Bridges to Razorpay Refund API (client.payment.refund / create_refund).
+	3. Transitions session to 'refunded' and records AuditAction.REFUND.
+	4. Dispatches HMAC-signed 'checkout_session.refunded' webhook event.
+	"""
+	session = get_session_by_id(session_id)
+	if not session:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	if session.status == SessionStatus.REFUNDED:
+		raise HTTPException(
+			status_code=status.HTTP_409_CONFLICT,
+			detail=f'Checkout session "{session_id}" has already been refunded with refund id "{session.payment_provider.refund_id}".'
+		)
+
+	if session.status != SessionStatus.COMPLETED:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Cannot refund session "{session_id}" in status "{session.status.value}". Only completed sessions can be refunded.'
+		)
+
+	refund_reason = request.reason if request and request.reason else 'Buyer requested post-completion refund'
+	refund_amount = request.amount if request and request.amount else session.totals.total
+
+	if refund_amount > session.totals.total:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Refund amount (₹{refund_amount}) cannot exceed original session total (₹{session.totals.total}).'
+		)
+
+	# Execute Razorpay refund via payment rail bridge
+	try:
+		refund_res = create_refund(
+			order_id=session.payment_provider.razorpay_order_id or session.id,
+			amount=refund_amount,
+			session_id=session.id,
+			reason=refund_reason
+		)
+	except Exception as exc:
+		logger.error(f'Failed to execute Razorpay refund for session {session_id}: {exc}')
+		raise HTTPException(
+			status_code=status.HTTP_502_BAD_GATEWAY,
+			detail=f'Payment rail refund failed: {str(exc)}'
+		)
+
+	now = datetime.now(timezone.utc)
+	session.payment_provider.refund_id = refund_res.get('id')
+	session.status = SessionStatus.REFUNDED
+	session.updated_at = now
+
+	save_session(session)
+
+	record_audit_entry(
+		session_id=session_id,
+		action=AuditAction.REFUND,
+		actor='buyer_agent_sim',
+		reason=refund_reason,
+		before_total=session.totals.total,
+		after_total=0.0
+	)
+
+	dispatch_webhook_event('checkout_session.refunded', {
+		'session_id': session.id,
+		'status': 'refunded',
+		'refund_id': session.payment_provider.refund_id,
+		'amount_refunded': refund_amount,
+		'reason': refund_reason
+	})
+
+	return session
+

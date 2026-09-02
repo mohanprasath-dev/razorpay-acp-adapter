@@ -21,7 +21,7 @@ import {
 	Play,
 } from 'lucide-react';
 import { CheckoutSession, AuditEntry } from '@/lib/types';
-import { fetchSessions, fetchGlobalAudit, checkBackendHealth } from '@/lib/api';
+import { fetchSessions, fetchGlobalAudit, checkBackendHealth, API_BASE_URL } from '@/lib/api';
 
 export default function DashboardPage() {
 	const [sessions, setSessions] = useState<CheckoutSession[]>([]);
@@ -31,6 +31,7 @@ export default function DashboardPage() {
 	const [filterStatus, setFilterStatus] = useState<string>('all');
 	const [searchQuery, setSearchQuery] = useState<string>('');
 	const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+	const [recentSessionIds, setRecentSessionIds] = useState<Set<string>>(new Set());
 
 	const loadData = async () => {
 		try {
@@ -40,7 +41,20 @@ export default function DashboardPage() {
 				fetchGlobalAudit(),
 			]);
 			setIsBackendOnline(online);
-			setSessions(sessionList);
+			setSessions((prevSessions) => {
+				const prevIds = new Set(prevSessions.map((s) => s.id));
+				const newIds = new Set<string>();
+				sessionList.forEach((s) => {
+					if (!prevIds.has(s.id) || prevSessions.find((p) => p.id === s.id && p.updated_at !== s.updated_at)) {
+						newIds.add(s.id);
+					}
+				});
+				if (newIds.size > 0 && prevSessions.length > 0) {
+					setRecentSessionIds(newIds);
+					setTimeout(() => setRecentSessionIds(new Set()), 3000);
+				}
+				return sessionList;
+			});
 			setAuditStream(auditList);
 		} catch (err) {
 			console.error('Failed to load dashboard data:', err);
@@ -54,7 +68,7 @@ export default function DashboardPage() {
 		if (!autoRefresh) return;
 		const interval = setInterval(() => {
 			loadData();
-		}, 4000);
+		}, 2000);
 		return () => clearInterval(interval);
 	}, [autoRefresh]);
 
@@ -73,7 +87,7 @@ export default function DashboardPage() {
 	const totalSessions = sessions.length;
 	const completedCount = sessions.filter((s) => s.status === 'completed').length;
 	const rejectedCount = sessions.filter((s) => s.status === 'rejected').length;
-	const cancelledCount = sessions.filter((s) => s.status === 'cancelled').length;
+	const refundedCount = sessions.filter((s) => s.status === 'refunded').length;
 
 	const getStatusBadge = (status: string) => {
 		switch (status) {
@@ -82,6 +96,13 @@ export default function DashboardPage() {
 					<span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
 						<CheckCircle2 className="w-3 h-3" />
 						completed
+					</span>
+				);
+			case 'refunded':
+				return (
+					<span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+						<RefreshCw className="w-3 h-3" />
+						refunded
 					</span>
 				);
 			case 'rejected':
@@ -166,7 +187,7 @@ export default function DashboardPage() {
 						<span
 							className={`w-2 h-2 rounded-full ${isBackendOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}
 						></span>
-						{isBackendOnline ? 'Backend Online (:8000)' : 'Backend Offline'}
+						{isBackendOnline ? 'Backend Rail Live' : 'Backend Offline'}
 					</div>
 
 					<div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium">
@@ -244,7 +265,7 @@ export default function DashboardPage() {
 
 						{/* Status Filters */}
 						<div className="flex flex-wrap gap-1.5 text-xs">
-							{['all', 'completed', 'rejected', 'updated', 'created', 'cancelled'].map((status) => (
+							{['all', 'completed', 'refunded', 'rejected', 'updated', 'created', 'cancelled'].map((status) => (
 								<button
 									key={status}
 									onClick={() => setFilterStatus(status)}
@@ -277,45 +298,64 @@ export default function DashboardPage() {
 											<th className="py-3 px-3">Status</th>
 											<th className="py-3 px-3">Buyer</th>
 											<th className="py-3 px-3">Total</th>
-											<th className="py-3 px-3">Razorpay Order</th>
+											<th className="py-3 px-3">Razorpay Order / Refund</th>
 											<th className="py-3 px-3 text-right">Audit Trail</th>
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-slate-800/40">
-										{filteredSessions.map((s) => (
-											<tr key={s.id} className="hover:bg-slate-800/20 transition-colors group">
-												<td className="py-3.5 px-3 font-mono font-medium text-blue-400">
-													<Link href={`/dashboard/${s.id}`} className="hover:underline flex items-center gap-1">
-														{s.id}
-													</Link>
-												</td>
-												<td className="py-3.5 px-3">{getStatusBadge(s.status)}</td>
-												<td className="py-3.5 px-3 text-slate-300">
-													{s.buyer?.email || <span className="text-slate-600 italic">—</span>}
-												</td>
-												<td className="py-3.5 px-3 font-mono font-medium text-slate-200">
-													₹{s.totals?.total?.toFixed(2) || '0.00'}
-												</td>
-												<td className="py-3.5 px-3 font-mono text-slate-400">
-													{s.payment_provider?.razorpay_order_id ? (
-														<span className="text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
-															{s.payment_provider.razorpay_order_id}
-														</span>
-													) : (
-														<span className="text-slate-600 italic">unassigned</span>
-													)}
-												</td>
-												<td className="py-3.5 px-3 text-right">
-													<Link
-														href={`/dashboard/${s.id}`}
-														className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-[11px] border border-slate-700/50"
-													>
-														Inspect
-														<ArrowUpRight className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-													</Link>
-												</td>
-											</tr>
-										))}
+										{filteredSessions.map((s) => {
+											const isRecent = recentSessionIds.has(s.id);
+											return (
+												<tr
+													key={s.id}
+													className={`transition-all duration-500 group ${
+														isRecent
+															? 'bg-blue-500/20 border-l-2 border-blue-400 shadow-sm shadow-blue-500/10'
+															: 'hover:bg-slate-800/20'
+													}`}
+												>
+													<td className="py-3.5 px-3 font-mono font-medium text-blue-400">
+														<Link href={`/dashboard/${s.id}`} className="hover:underline flex items-center gap-1">
+															{s.id}
+															{isRecent && (
+																<span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping"></span>
+															)}
+														</Link>
+													</td>
+													<td className="py-3.5 px-3">{getStatusBadge(s.status)}</td>
+													<td className="py-3.5 px-3 text-slate-300">
+														{s.buyer?.email || <span className="text-slate-600 italic">—</span>}
+													</td>
+													<td className="py-3.5 px-3 font-mono font-medium text-slate-200">
+														₹{s.totals?.total?.toFixed(2) || '0.00'}
+													</td>
+													<td className="py-3.5 px-3 font-mono text-slate-400 space-y-1">
+														{s.payment_provider?.razorpay_order_id && (
+															<div className="text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 inline-block">
+																{s.payment_provider.razorpay_order_id}
+															</div>
+														)}
+														{s.payment_provider?.refund_id && (
+															<div className="text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 inline-block ml-1">
+																{s.payment_provider.refund_id}
+															</div>
+														)}
+														{!s.payment_provider?.razorpay_order_id && !s.payment_provider?.refund_id && (
+															<span className="text-slate-600 italic">unassigned</span>
+														)}
+													</td>
+													<td className="py-3.5 px-3 text-right">
+														<Link
+															href={`/dashboard/${s.id}`}
+															className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-[11px] border border-slate-700/50"
+														>
+															Inspect
+															<ArrowUpRight className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+														</Link>
+													</td>
+												</tr>
+											);
+										})}
 									</tbody>
 								</table>
 							</div>
@@ -353,7 +393,7 @@ export default function DashboardPage() {
 
 							<div className="pt-3 border-t border-slate-800/80">
 								<a
-									href="http://localhost:8000/.well-known/agent.json"
+									href={`${API_BASE_URL}/.well-known/agent.json`}
 									target="_blank"
 									rel="noreferrer"
 									className="text-xs text-blue-400 hover:text-blue-300 flex items-center justify-between group"

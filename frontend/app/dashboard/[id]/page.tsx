@@ -68,6 +68,13 @@ export default function SessionDetailPage() {
 						Completed
 					</span>
 				);
+			case 'refunded':
+				return (
+					<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+						<RefreshCw className="w-3.5 h-3.5" />
+						Refunded (Post-Completion)
+					</span>
+				);
 			case 'rejected':
 				return (
 					<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -270,15 +277,22 @@ export default function SessionDetailPage() {
 						</div>
 
 						{/* Razorpay Bridge Info */}
-						{session?.payment_provider?.razorpay_order_id && (
+						{(session?.payment_provider?.razorpay_order_id || session?.payment_provider?.refund_id) && (
 							<div className="p-5 rounded-xl bg-indigo-950/20 border border-indigo-500/30 space-y-2 text-xs">
 								<div className="flex items-center gap-2 text-indigo-400 font-semibold">
 									<CreditCard className="w-4 h-4" />
-									<span>Razorpay Order Rail</span>
+									<span>Razorpay Payment Rail</span>
 								</div>
-								<div className="font-mono text-slate-300 break-all">
-									Order ID: <span className="text-indigo-300">{session.payment_provider.razorpay_order_id}</span>
-								</div>
+								{session?.payment_provider?.razorpay_order_id && (
+									<div className="font-mono text-slate-300 break-all">
+										Order ID: <span className="text-indigo-300">{session.payment_provider.razorpay_order_id}</span>
+									</div>
+								)}
+								{session?.payment_provider?.refund_id && (
+									<div className="font-mono text-purple-300 break-all">
+										Refund ID: <span className="text-purple-300">{session.payment_provider.refund_id}</span>
+									</div>
+								)}
 							</div>
 						)}
 					</div>
@@ -307,6 +321,7 @@ export default function SessionDetailPage() {
 								{auditEntries.map((entry, index) => {
 									const isReject = entry.action === 'reject';
 									const isComplete = entry.action === 'complete';
+									const isRefund = entry.action === 'refund';
 									const isCancel = entry.action === 'cancel';
 									const isUpdate = entry.action === 'update';
 
@@ -317,6 +332,8 @@ export default function SessionDetailPage() {
 												className={`absolute -left-6 top-1 w-4 h-4 rounded-full border-2 bg-[#090a0f] flex items-center justify-center ${
 													isReject
 														? 'border-rose-500 bg-rose-500/20'
+														: isRefund
+														? 'border-purple-500 bg-purple-500/20'
 														: isComplete
 														? 'border-emerald-500 bg-emerald-500/20'
 														: isCancel
@@ -330,6 +347,8 @@ export default function SessionDetailPage() {
 													className={`w-1.5 h-1.5 rounded-full ${
 														isReject
 															? 'bg-rose-400'
+															: isRefund
+															? 'bg-purple-400'
 															: isComplete
 															? 'bg-emerald-400'
 															: isCancel
@@ -348,6 +367,8 @@ export default function SessionDetailPage() {
 														className={`text-xs font-mono uppercase px-2 py-0.5 rounded font-bold ${
 															isReject
 																? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+																: isRefund
+																? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
 																: isComplete
 																? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
 																: isCancel

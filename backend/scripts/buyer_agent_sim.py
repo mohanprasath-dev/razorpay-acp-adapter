@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Autonomous Buyer-Agent Simulator for Razorpay ACP Adapter.
-Supports two deterministic demo scenarios:
-1. --scenario happy_path : Full Discovery -> Catalog -> Create -> Update -> Complete
-2. --scenario violation  : Deliberate Guardrail Breach -> Structured Rejection -> Explainability -> Recovery -> Complete
+4-Act Live Demonstration Suite:
+- ACT 1: Protocol Discovery & Catalog Feed (Unauthenticated capability resolution)
+- ACT 2: Happy Path Order Lifecycle (Create -> Update -> Complete with Razorpay Order)
+- ACT 3: Security & Guardrail Attack Suite (Price Tamper Neutralization + Discount Ceiling Enforcement)
+- ACT 4: Protocol Resilience & Lifecycle (Idempotent Replay + Session Cancellation + Post-Payment Refund)
 
-Designed for live demo recordings and track requirement verification.
+Designed for live demo recordings, judge walkthroughs, and track requirement verification.
 """
 import sys
 import json
 import time
+import uuid
 import argparse
 import urllib.request
 import urllib.error
@@ -33,8 +36,14 @@ DIM = '\033[2m'
 RESET = '\033[0m'
 
 
-def log_step(step_num: int, title: str, description: str):
-	print(f'\n{BOLD}{CYAN}======================================================================{RESET}')
+def log_act(act_num: int, title: str):
+	print(f'\n{BOLD}{MAGENTA}======================================================================{RESET}')
+	print(f'{BOLD}{MAGENTA}>>> ACT {act_num}: {title}{RESET}')
+	print(f'{BOLD}{MAGENTA}======================================================================{RESET}')
+
+
+def log_step(step_num: str, title: str, description: str):
+	print(f'\n{BOLD}{CYAN}----------------------------------------------------------------------{RESET}')
 	print(f'{BOLD}{GREEN}[STEP {step_num}]{RESET} {BOLD}{title}{RESET}')
 	print(f'{DIM}>> {description}{RESET}')
 	print(f'{BOLD}{CYAN}----------------------------------------------------------------------{RESET}')
@@ -90,37 +99,43 @@ def http_request(
 		sys.exit(1)
 
 
-def run_happy_path(base_url: str, pause_seconds: float = 0.4):
-	print(f'\n{BOLD}{CYAN}>>> RUNNING SCENARIO: HAPPY PATH (Full ACP Lifecycle){RESET}')
+def run_act_1_discovery(base_url: str, pause: float):
+	log_act(1, 'Protocol Discovery & Capability Resolution')
 
-	# STEP 1: Discovery
-	log_step(1, 'ACP Protocol Discovery', 'Querying unauthenticated well-known capability manifest')
+	# Step 1.1: Discovery
+	log_step('1.1', 'Fetch Agent Capability Document', 'Querying unauthenticated well-known capability manifest')
 	res = http_request(f'{base_url}/.well-known/agent.json')
 	if res['status_code'] != 200:
 		log_error(f'Discovery failed: {res["data"]}')
 		sys.exit(1)
-	log_payload('Agent Capability Document', res['data'])
-	log_success(f'Discovered merchant "{res["data"]["merchant"]["name"]}" | Spec {res["data"]["spec_version"]} | Rail: {res["data"]["payment_provider"]}')
-	time.sleep(pause_seconds)
+	agent_doc = res['data']
+	log_payload('Agent Capability Manifest', agent_doc)
+	log_success(f'Discovered merchant "{agent_doc["merchant"]["name"]}" | Spec {agent_doc["spec_version"]} | Settlement: {agent_doc["merchant"]["default_currency"]} | Rail: {agent_doc["payment_provider"]}')
+	time.sleep(pause)
 
-	# STEP 2: Catalog Lookup
-	log_step(2, 'Catalog Feed Retrieval', 'Fetching active merchant product catalog')
+	# Step 1.2: Catalog
+	log_step('1.2', 'Fetch Merchant Product Catalog Feed', 'Reading unauthenticated SKU list')
 	res = http_request(f'{base_url}/products')
 	if res['status_code'] != 200:
 		log_error(f'Catalog lookup failed: {res["data"]}')
 		sys.exit(1)
 	products = res['data']
-	log_payload('Catalog Feed', products)
-	p1, p2 = products[0], products[3]
-	log_success(f'Catalog active with {len(products)} SKUs. Selecting: "{p1["name"]}" (Rs {p1["price"]}) & "{p2["name"]}" (Rs {p2["price"]})')
-	time.sleep(pause_seconds)
+	log_payload('Active Product Catalog', products)
+	log_success(f'Catalog live with {len(products)} SKUs. Sample: "{products[0]["name"]}" at ₹{products[0]["price"]}')
+	time.sleep(pause)
+	return products
 
-	# STEP 3: Create Session
-	log_step(3, 'Create ACP Checkout Session', 'Submitting initial cart')
+
+def run_act_2_happy_path(base_url: str, products: list, pause: float):
+	log_act(2, 'Happy Path Checkout Lifecycle')
+	p1, p2 = products[0], products[3]
+
+	# Step 2.1: Create Session
+	log_step('2.1', 'Create Authoritative ACP Checkout Session', 'Agent submits initial cart with 1 SKU')
 	create_payload = {
 		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
 		'buyer': {
-			'name': 'Aura Buyer Agent (Autonomous Node #42)',
+			'name': 'Aura Autonomous Buyer Agent #42',
 			'email': 'aura.agent@taskdrift.internal'
 		}
 	}
@@ -130,12 +145,12 @@ def run_happy_path(base_url: str, pause_seconds: float = 0.4):
 		sys.exit(1)
 	session = res['data']
 	session_id = session['id']
-	log_payload('Authoritative Session', session)
-	log_success(f'Session created: {session_id} | Total: Rs {session["totals"]["total"]}')
-	time.sleep(pause_seconds)
+	log_payload('Created Checkout Session', session)
+	log_success(f'Session {session_id} created. Authoritative Total: ₹{session["totals"]["total"]}')
+	time.sleep(pause)
 
-	# STEP 4: Update Session
-	log_step(4, 'Update Checkout Session', 'Updating cart line items and applying discount')
+	# Step 2.2: Update Session
+	log_step('2.2', 'Update Cart & Apply Merchant-Bound Discount', 'Agent updates line items and applies ₹100 discount')
 	update_payload = {
 		'line_items': [
 			{'product_id': p1['id'], 'quantity': 2},
@@ -148,119 +163,151 @@ def run_happy_path(base_url: str, pause_seconds: float = 0.4):
 		log_error(f'Update session failed: {res["data"]}')
 		sys.exit(1)
 	updated = res['data']
-	log_payload('Refreshed Session', updated)
-	log_success(f'Session updated: {session_id} | Refreshed Total: Rs {updated["totals"]["total"]}')
-	time.sleep(pause_seconds)
+	log_payload('Updated Checkout Session', updated)
+	log_success(f'Session {session_id} updated. New Total: ₹{updated["totals"]["total"]} (includes ₹{updated["totals"]["tax"]} GST)')
+	time.sleep(pause)
 
-	# STEP 5: Complete Session
-	log_step(5, 'Complete Session & Bridge to Razorpay', 'Finalizing checkout session and triggering Razorpay Order creation')
+	# Step 2.3: Complete Session
+	log_step('2.3', 'Finalize Checkout & Bridge to Razorpay Orders API', 'Agent executes completion transition')
 	res = http_request(f'{base_url}/checkout_sessions/{session_id}/complete', method='POST')
 	if res['status_code'] != 200:
 		log_error(f'Complete session failed: {res["data"]}')
 		sys.exit(1)
 	completed = res['data']
 	log_payload('Finalized Checkout State', completed)
-	log_success(f'Transaction Completed! Razorpay Order ID: {BOLD}{completed["payment_provider"]["razorpay_order_id"]}{RESET} | Status: {completed["status"]}')
+	order_id = completed["payment_provider"]["razorpay_order_id"]
+	log_success(f'Transaction Complete! Razorpay Order ID: {BOLD}{order_id}{RESET} | Status: {completed["status"]}')
+	time.sleep(pause)
+	return session_id
 
 
-def run_violation_scenario(base_url: str, pause_seconds: float = 0.4):
-	print(f'\n{BOLD}{MAGENTA}>>> RUNNING SCENARIO: DELIBERATE GUARDRAIL BREACH & EXPLAINABILITY DEMO{RESET}')
+def run_act_3_attack_suite(base_url: str, products: list, pause: float):
+	log_act(3, 'Security & Guardrail Attack Suite (Judge Highlight)')
+	p1 = products[0]  # Real catalog price: ₹499.0
 
-	# STEP 1: Discovery
-	log_step(1, 'ACP Protocol & Guardrail Discovery', 'Reading merchant bounds from agent capability manifest')
-	res = http_request(f'{base_url}/.well-known/agent.json')
-	agent_doc = res['data']
-	guardrails = agent_doc.get('guardrails', {})
-	log_payload('Merchant Guardrails Configuration', guardrails)
-	log_success(f'Merchant Bounds: Max Discount = {guardrails.get("max_discount_percentage")}%, Max Order = Rs {guardrails.get("max_order_value_inr")}, Max Qty = {guardrails.get("max_quantity_per_item")}')
-	time.sleep(pause_seconds)
-
-	# STEP 2: Create Session
-	log_step(2, 'Create Valid Checkout Session', 'Buyer agent initiates a valid session with 1 unit of product')
-	res = http_request(f'{base_url}/products')
-	products = res['data']
-	p1 = products[0]  # Rs 499.0
-
-	create_payload = {
-		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
-		'buyer': {'name': 'Simulator Agent (Audit Persona)', 'email': 'sim.audit@taskdrift.internal'}
+	# Attack 3A: Client-Side Price Tampering
+	log_step('3A', 'ATTACK: Client-Side Price Tampering Attempt', 'Malicious agent attempts to pass unit_price=₹1.00 on a ₹499.00 item')
+	tamper_payload = {
+		'line_items': [{'product_id': p1['id'], 'quantity': 1, 'unit_price': 1.0}],
+		'buyer': {'name': 'Tamper Test Agent', 'email': 'attacker@flow.ai'}
 	}
-	res = http_request(f'{base_url}/checkout_sessions', method='POST', data=create_payload)
-	session_id = res['data']['id']
-	log_payload('Active Session', res['data'])
-	log_success(f'Session {session_id} active. Subtotal: Rs {res["data"]["totals"]["subtotal"]}')
-	time.sleep(pause_seconds)
-
-	# STEP 3: Deliberate Guardrail Violation (Over-bound discount)
-	log_step(3, 'Trigger Deliberate Violation', 'Buyer agent requests a 70% discount (Rs 350 on Rs 499), exceeding the 50% merchant limit')
-	excessive_discount_payload = {
-		'discount': 350.0  # ~70.1% discount > 50% max bound
-	}
-	log_payload('Excessive Discount Request', excessive_discount_payload)
-
-	res = http_request(f'{base_url}/checkout_sessions/{session_id}', method='POST', data=excessive_discount_payload)
-	log_payload('Server Guardrail Response (HTTP 400)', res['data'])
-
-	if res['status_code'] == 400 and res['data'].get('detail', {}).get('error') == 'guardrail_violation':
-		detail = res['data']['detail']
-		log_warning(f'BOUND ENFORCED! Session transitioned to status: "{detail.get("status")}"')
-		log_warning(f'Human-Readable Explainability Reason: "{detail.get("reason")}"')
-	else:
-		log_error(f'Expected clean guardrail violation rejection but received HTTP {res["status_code"]}: {res["data"]}')
+	log_payload('Attacker Injected Request (unit_price: 1.0)', tamper_payload)
+	res = http_request(f'{base_url}/checkout_sessions', method='POST', data=tamper_payload)
+	if res['status_code'] != 201:
+		log_error(f'Expected authoritative override but received {res["status_code"]}')
 		sys.exit(1)
-	time.sleep(pause_seconds)
+	tamper_session = res['data']
+	log_payload('Server Evaluated Session (Authoritative Catalog Pricing Enforced)', tamper_session)
+	assert tamper_session['line_items'][0]['unit_price'] == 499.0
+	assert tamper_session['totals']['subtotal'] == 499.0
+	log_success('ATTACK NEUTRALIZED: Server completely ignored client unit_price (₹1.0) and enforced authoritative catalog price (₹499.0).')
+	time.sleep(pause)
 
-	# STEP 4: Inspect Firestore State & Audit Log
-	log_step(4, 'Audit Trail Verification', 'Verifying session status in database and confirming rejection explanation')
-	res = http_request(f'{base_url}/checkout_sessions/{session_id}')
-	log_payload('Persisted Rejected Session State', res['data'])
-	assert res['data']['status'] == 'rejected'
-	log_success('Verified: Session is safely locked in "rejected" state without crashes or silent errors.')
-	time.sleep(pause_seconds)
+	# Attack 3B: Discount Ceiling Breach
+	log_step('3B', 'ATTACK: Discount Ceiling Breach Attempt (75% Discount Request)', 'Agent attempts to apply a ₹375.00 discount on a ₹499.00 order (75.1% > 50% merchant bound)')
+	excessive_discount_payload = {'discount': 375.0}
+	res_breach = http_request(f'{base_url}/checkout_sessions/{tamper_session["id"]}', method='POST', data=excessive_discount_payload)
+	log_payload('Server Guardrail Rejection Response (HTTP 400)', res_breach['data'])
 
-	# STEP 5: Graceful Recovery & Completion
-	log_step(5, 'Graceful Recovery Flow', 'Buyer agent initiates a fresh, compliant session within merchant bounds and finalizes purchase')
+	if res_breach['status_code'] == 400 and res_breach['data'].get('detail', {}).get('error') == 'guardrail_violation':
+		detail = res_breach['data']['detail']
+		log_warning(f'BOUND ENFORCED: Status transitioned to "{detail.get("status")}"')
+		log_warning(f'Deterministic Explainability Reason: "{detail.get("reason")}"')
+	else:
+		log_error(f'Expected clean guardrail violation rejection but received HTTP {res_breach["status_code"]}: {res_breach["data"]}')
+		sys.exit(1)
+	time.sleep(pause)
+
+	# Step 3.2: Recovery
+	log_step('3.2', 'Graceful Recovery Flow', 'Agent corrects cart within merchant bounds and finalizes purchase')
 	compliant_payload = {
 		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
-		'discount': 50.0,  # ~10% discount (Well within 50% bound)
+		'discount': 50.0,
 		'buyer': {'name': 'Recovered Agent Buyer', 'email': 'recovered@taskdrift.internal'}
 	}
 	res_fresh = http_request(f'{base_url}/checkout_sessions', method='POST', data=compliant_payload)
-	fresh_session_id = res_fresh['data']['id']
-	log_success(f'Fresh compliant session created: {fresh_session_id} | Total: Rs {res_fresh["data"]["totals"]["total"]}')
+	fresh_sid = res_fresh['data']['id']
+	res_comp = http_request(f'{base_url}/checkout_sessions/{fresh_sid}/complete', method='POST')
+	log_success(f'Recovery Complete! Fresh Session {fresh_sid} finalized with Razorpay Order ID: {BOLD}{res_comp["data"]["payment_provider"]["razorpay_order_id"]}{RESET}')
+	time.sleep(pause)
 
-	# Complete fresh session
-	res_complete = http_request(f'{base_url}/checkout_sessions/{fresh_session_id}/complete', method='POST')
-	if res_complete['status_code'] == 200:
-		log_success(f'Recovery Complete! Razorpay Order ID: {BOLD}{res_complete["data"]["payment_provider"]["razorpay_order_id"]}{RESET}')
-	else:
-		log_error(f'Recovery completion failed: {res_complete["data"]}')
-		sys.exit(1)
+
+def run_act_4_resilience_and_lifecycle(base_url: str, products: list, pause: float):
+	log_act(4, 'Protocol Resilience, Idempotency & Post-Payment Refund')
+	p1 = products[0]
+
+	# 4A: Idempotent Replay
+	log_step('4A', 'Idempotent Replay Verification', 'Sending identical Idempotency-Key twice to verify 0 duplicate sessions created')
+	idem_key = f'idem_sim_{uuid.uuid4().hex[:12]}'
+	payload = {'line_items': [{'product_id': p1['id'], 'quantity': 1}]}
+
+	res_1 = http_request(f'{base_url}/checkout_sessions', method='POST', data=payload, headers={'Idempotency-Key': idem_key})
+	sid_1 = res_1['data']['id']
+
+	res_2 = http_request(f'{base_url}/checkout_sessions', method='POST', data=payload, headers={'Idempotency-Key': idem_key})
+	sid_2 = res_2['data']['id']
+
+	assert sid_1 == sid_2, f'Mismatch in idempotency sessions: {sid_1} vs {sid_2}'
+	log_success(f'Idempotency Verified: Both requests returned identical session {sid_1} with zero duplication.')
+	time.sleep(pause)
+
+	# 4B: Session Cancellation
+	log_step('4B', 'Session Cancellation & Terminal State Lock', 'Cancelling an incomplete session and asserting terminal locking')
+	res_cancel = http_request(f'{base_url}/checkout_sessions/{sid_1}/cancel', method='POST')
+	assert res_cancel['data']['status'] == 'cancelled'
+	log_success(f'Session {sid_1} transitioned to "cancelled".')
+
+	# Verify repeat cancel gives HTTP 409 Conflict
+	res_re_cancel = http_request(f'{base_url}/checkout_sessions/{sid_1}/cancel', method='POST')
+	assert res_re_cancel['status_code'] == 409
+	log_success('Verified: Re-cancellation safely rejected with HTTP 409 Conflict.')
+	time.sleep(pause)
+
+	# 4C: Post-Payment Refund
+	log_step('4C', 'Post-Payment Refund Bridge', 'Executing post-completion refund via Razorpay refund bridge')
+	# Create and complete a session
+	res_c = http_request(f'{base_url}/checkout_sessions', method='POST', data={'line_items': [{'product_id': p1['id'], 'quantity': 1}]})
+	sid_c = res_c['data']['id']
+	http_request(f'{base_url}/checkout_sessions/{sid_c}/complete', method='POST')
+
+	# Issue refund
+	res_refund = http_request(f'{base_url}/checkout_sessions/{sid_c}/refund', method='POST', data={
+		'reason': 'Customer returned items within 14-day window'
+	})
+	assert res_refund['status_code'] == 200
+	refunded_data = res_refund['data']
+	log_payload('Refunded Session State', refunded_data)
+	log_success(f'Session {sid_c} refunded! Razorpay Refund ID: {BOLD}{refunded_data["payment_provider"]["refund_id"]}{RESET} | Status: {refunded_data["status"]}')
 
 
 def main():
-	parser = argparse.ArgumentParser(description='Run Scripted Buyer-Agent Simulator for Razorpay ACP Adapter')
-	parser.add_argument('--base-url', default='http://localhost:8000', help='Target ACP backend base URL')
-	parser.add_argument('--scenario', choices=['happy_path', 'violation', 'all'], default='happy_path', help='Simulation scenario to execute')
-	parser.add_argument('--pause', type=float, default=0.3, help='Pause between steps in seconds for recording clarity')
+	parser = argparse.ArgumentParser(description='Run Scripted 4-Act Buyer-Agent Simulator for Razorpay ACP Adapter')
+	parser.add_argument('--base-url', default='http://127.0.0.1:8000', help='Target ACP backend base URL')
+	parser.add_argument('--scenario', choices=['happy_path', 'violation', 'all'], default='all', help='Simulation scenario to execute')
+	parser.add_argument('--pause', type=float, default=0.2, help='Pause between steps in seconds for recording clarity')
 	args = parser.parse_args()
 
 	print(f'{BOLD}{MAGENTA}')
 	print("======================================================================")
-	print("       RAZORPAY ACP CHECKOUT ADAPTER -- BUYER AGENT SIMULATOR         ")
+	print("       RAZORPAY ACP CHECKOUT ADAPTER -- 4-ACT BUYER AGENT SIMULATOR   ")
 	print("          Track 01: AI Growth & Agentic Commerce | TaskDrift          ")
 	print("======================================================================")
 	print(f'{RESET}{DIM}Target Rail API: {args.base_url}{RESET}')
 	print(f'{DIM}Protocol Specification: ACP v2026-04-17 | Rail: Razorpay Test Mode{RESET}')
 
+	products = run_act_1_discovery(base_url=args.base_url, pause=args.pause)
+
 	if args.scenario in ['happy_path', 'all']:
-		run_happy_path(base_url=args.base_url, pause_seconds=args.pause)
+		run_act_2_happy_path(base_url=args.base_url, products=products, pause=args.pause)
 
 	if args.scenario in ['violation', 'all']:
-		run_violation_scenario(base_url=args.base_url, pause_seconds=args.pause)
+		run_act_3_attack_suite(base_url=args.base_url, products=products, pause=args.pause)
+
+	if args.scenario in ['all']:
+		run_act_4_resilience_and_lifecycle(base_url=args.base_url, products=products, pause=args.pause)
 
 	print(f'\n{BOLD}{GREEN}======================================================================{RESET}')
-	print(f'{BOLD}{GREEN}[OK] ALL SIMULATED SCENARIOS EXECUTED SUCCESSFULLY WITH 0 UNHANDLED ERRORS{RESET}')
+	print(f'{BOLD}{GREEN}[OK] ALL 4 ACTS EXECUTED SUCCESSFULLY WITH 0 UNHANDLED ERRORS{RESET}')
 	print(f'{BOLD}{GREEN}======================================================================{RESET}\n')
 
 

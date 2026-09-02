@@ -58,12 +58,23 @@ async def get_agent_discovery():
 		'merchant': {
 			'name': settings.MERCHANT_NAME,
 			'country': 'IN',
-			'default_currency': 'INR'
+			'default_currency': 'INR',
+			'supported_currencies': ['INR']
 		},
 		'payment_provider': 'razorpay',
 		'authentication': {
 			'type': 'none_for_discovery',
 			'session_management': 'idempotency_key_header'
+		},
+		'webhooks': {
+			'supported': True,
+			'signature_scheme': 'HMAC-SHA256',
+			'signature_header': 'X-ACP-Signature',
+			'timestamp_header': 'X-ACP-Timestamp'
+		},
+		'rate_limits': {
+			'requests_per_minute': settings.RATE_LIMIT_PER_MINUTE,
+			'strategy': 'sliding_window'
 		},
 		'endpoints': {
 			'discovery': '/.well-known/agent.json',
@@ -72,7 +83,8 @@ async def get_agent_discovery():
 			'checkout_sessions_update': '/checkout_sessions/{id}',
 			'checkout_sessions_get': '/checkout_sessions/{id}',
 			'checkout_sessions_complete': '/checkout_sessions/{id}/complete',
-			'checkout_sessions_cancel': '/checkout_sessions/{id}/cancel'
+			'checkout_sessions_cancel': '/checkout_sessions/{id}/cancel',
+			'checkout_sessions_refund': '/checkout_sessions/{id}/refund'
 		},
 		'guardrails': {
 			'max_discount_percentage': 50,

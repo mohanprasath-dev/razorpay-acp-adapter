@@ -107,3 +107,9 @@ def test_all_seven_endpoints_reachability():
 	}).json()['id']
 	res7 = client.post(f'/checkout_sessions/{fresh_sid}/cancel')
 	assert res7.status_code == 200
+
+	# 8. POST /checkout_sessions/{id}/refund on the completed session
+	res8 = client.post(f'/checkout_sessions/{sid}/refund', json={'reason': 'Integration reachability test'})
+	assert res8.status_code == 200
+	assert res8.json()['status'] == 'refunded'
+

@@ -19,6 +19,17 @@ def convert_to_paise(amount: float) -> int:
 	return int(round(float(amount) * 100))
 
 
+def is_placeholder_key(key: str) -> bool:
+	"""Checks whether key is empty or a placeholder credential."""
+	key_lower = (key or '').lower()
+	return (
+		not key_lower
+		or 'placeholder' in key_lower
+		or 'yourtestkey' in key_lower
+		or key_lower in ['rzp_test_placeholder', 'rzp_test_yourtestkeyidhere']
+	)
+
+
 def create_order(
 	amount: float,
 	currency: str,
@@ -50,7 +61,7 @@ def create_order(
 
 	settings = get_settings()
 	# Check if placeholder test credentials are used in local offline test
-	if settings.RAZORPAY_KEY_ID in ['rzp_test_placeholder', '', 'placeholder']:
+	if is_placeholder_key(settings.RAZORPAY_KEY_ID):
 		return {
 			'id': f'order_test_{uuid.uuid4().hex[:14]}',
 			'entity': 'order',
@@ -109,7 +120,7 @@ def create_refund(
 	settings = get_settings()
 
 	# Offline / placeholder test mode
-	if settings.RAZORPAY_KEY_ID in ['rzp_test_placeholder', '', 'placeholder']:
+	if is_placeholder_key(settings.RAZORPAY_KEY_ID):
 		return {
 			'id': f'rfrq_{uuid.uuid4().hex[:14]}',
 			'entity': 'refund',

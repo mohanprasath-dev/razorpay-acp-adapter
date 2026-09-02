@@ -54,3 +54,4 @@ next-env.d.ts
 *.swo
 .DS_Store
 Thumbs.db
+fresh_clone_test/

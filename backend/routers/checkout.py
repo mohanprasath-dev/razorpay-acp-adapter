@@ -1,10 +1,10 @@
 """Checkout Session Router for Agentic Commerce Protocol (ACP).
-Handles creation, updating, retrieval, completion, authoritative totals calculation, and session persistence.
+Handles creation, updating, retrieval, completion, cancellation, guardrail bounds checking, and audit logging.
 """
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from backend.models import (
@@ -17,7 +17,9 @@ from backend.models import (
 	SessionStatus,
 )
 from backend.services.pricing import compute_authoritative_totals
+from backend.services.guardrails import validate_guardrails
 from backend.services.razorpay_service import create_order
+from backend.services.audit import record_audit_entry, get_all_audit_entries, get_session_audit_entries
 from backend.db.firestore import get_firestore_client
 
 logger = logging.getLogger(__name__)
@@ -27,7 +29,6 @@ router = APIRouter(prefix='/checkout_sessions', tags=['Checkout Sessions'])
 # In-memory session store & idempotency cache for local/offline testing
 _sessions_store: Dict[str, CheckoutSession] = {}
 _idempotency_store: Dict[str, str] = {}
-_audit_log_store: List[AuditEntry] = []
 
 
 class RawLineItemInput(BaseModel):
@@ -80,47 +81,17 @@ def get_session_by_id(session_id: str) -> Optional[CheckoutSession]:
 	return None
 
 
-def record_audit(
-	session_id: str,
-	action: AuditAction,
-	actor: str = 'buyer_agent_sim',
-	reason: Optional[str] = None,
-	before_total: Optional[float] = None,
-	after_total: Optional[float] = None
-) -> AuditEntry:
-	"""Records an immutable audit entry into memory and Firestore."""
-	audit_entry = AuditEntry(
-		id=f'audit_{uuid.uuid4().hex[:12]}',
-		session_id=session_id,
-		action=action,
-		actor=actor,
-		reason=reason,
-		before_total=before_total,
-		after_total=after_total,
-		timestamp=datetime.now(timezone.utc)
-	)
-	_audit_log_store.append(audit_entry)
-
-	db = get_firestore_client()
-	if db is not None:
-		try:
-			audit_dict = audit_entry.model_dump(mode='json')
-			db.collection('audit_entries').document(audit_entry.id).set(audit_dict)
-		except Exception:
-			pass
-
-	return audit_entry
-
-
 @router.post('', status_code=status.HTTP_201_CREATED, response_model=CheckoutSession, summary='Create Checkout Session')
 async def create_checkout_session(
 	request: CreateCheckoutSessionRequest,
 	idempotency_key: Optional[str] = Header(default=None, alias='Idempotency-Key')
 ):
 	"""
-	Creates a new ACP Checkout Session with authoritative pricing, 18% tax calculation,
-	Razorpay payment provider metadata, and immutable audit logging.
-	Supports Idempotency-Key header for safe retries.
+	Creates a new ACP Checkout Session:
+	1. Enforces idempotency via Idempotency-Key header.
+	2. Computes authoritative pricing from server catalog.
+	3. Runs deterministic guardrail rule engine (max discount, max order value, max quantity).
+	4. Persists session and writes immutable AuditEntry for all checks (pass or reject).
 	"""
 	# Check Idempotency Key
 	if idempotency_key:
@@ -133,19 +104,30 @@ async def create_checkout_session(
 	if not request.line_items:
 		raise HTTPException(status_code=400, detail='line_items array cannot be empty.')
 
+	discount_amount = request.discount or 0.0
+
 	# Compute authoritative totals and line items
 	raw_items = [item.model_dump() for item in request.line_items]
 	authoritative_items, totals = compute_authoritative_totals(
 		raw_items=raw_items,
-		discount_amount=request.discount or 0.0
+		discount_amount=discount_amount
 	)
 
 	session_id = f'cs_{uuid.uuid4().hex[:16]}'
 	now = datetime.now(timezone.utc)
 
+	# Evaluate Guardrails
+	passed, reject_reason = validate_guardrails(
+		line_items=authoritative_items,
+		totals=totals,
+		discount_amount=discount_amount
+	)
+
+	initial_status = SessionStatus.CREATED if passed else SessionStatus.REJECTED
+
 	session = CheckoutSession(
 		id=session_id,
-		status=SessionStatus.CREATED,
+		status=initial_status,
 		line_items=authoritative_items,
 		buyer=request.buyer,
 		fulfillment_address=request.fulfillment_address,
@@ -163,15 +145,34 @@ async def create_checkout_session(
 		_idempotency_store[idempotency_key] = session_id
 
 	# Record audit log
-	record_audit(
-		session_id=session_id,
-		action=AuditAction.CREATE,
-		actor='buyer_agent_sim',
-		before_total=None,
-		after_total=totals.total
-	)
-
-	return session
+	if passed:
+		record_audit_entry(
+			session_id=session_id,
+			action=AuditAction.CREATE,
+			actor='buyer_agent_sim',
+			reason=None,
+			before_total=None,
+			after_total=totals.total
+		)
+		return session
+	else:
+		record_audit_entry(
+			session_id=session_id,
+			action=AuditAction.REJECT,
+			actor='buyer_agent_sim',
+			reason=reject_reason,
+			before_total=None,
+			after_total=totals.total
+		)
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail={
+				'error': 'guardrail_violation',
+				'reason': reject_reason,
+				'session_id': session_id,
+				'status': 'rejected'
+			}
+		)
 
 
 @router.get('/{session_id}', response_model=CheckoutSession, summary='Get Checkout Session')
@@ -192,8 +193,8 @@ async def get_checkout_session(session_id: str):
 @router.post('/{session_id}', response_model=CheckoutSession, summary='Update Checkout Session')
 async def update_checkout_session(session_id: str, request: UpdateCheckoutSessionRequest):
 	"""
-	Updates an existing checkout session with line item modifications, shipping address,
-	or discounts. Recomputes authoritative totals and marks status as 'updated'.
+	Updates an existing checkout session.
+	Evaluates guardrail rules on new configuration before applying.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -224,7 +225,6 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 		)
 		new_line_items = authoritative_items
 	elif request.discount is not None:
-		# Recalculate totals for existing items with new discount
 		raw_items = [{'product_id': item.product_id, 'quantity': item.quantity} for item in session.line_items]
 		_, totals = compute_authoritative_totals(
 			raw_items=raw_items,
@@ -233,12 +233,42 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 	else:
 		totals = session.totals
 
-	# Update buyer & address if supplied
+	# Evaluate Guardrails for update
+	passed, reject_reason = validate_guardrails(
+		line_items=new_line_items,
+		totals=totals,
+		discount_amount=new_discount
+	)
+
+	now = datetime.now(timezone.utc)
 	new_buyer = request.buyer if request.buyer is not None else session.buyer
 	new_address = request.fulfillment_address if request.fulfillment_address is not None else session.fulfillment_address
 
-	# Refresh session object
-	now = datetime.now(timezone.utc)
+	if not passed:
+		session.status = SessionStatus.REJECTED
+		session.updated_at = now
+		save_session(session)
+
+		record_audit_entry(
+			session_id=session_id,
+			action=AuditAction.REJECT,
+			actor='buyer_agent_sim',
+			reason=reject_reason,
+			before_total=before_total,
+			after_total=totals.total
+		)
+
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail={
+				'error': 'guardrail_violation',
+				'reason': reject_reason,
+				'session_id': session_id,
+				'status': 'rejected'
+			}
+		)
+
+	# Update session
 	session.line_items = new_line_items
 	session.buyer = new_buyer
 	session.fulfillment_address = new_address
@@ -250,7 +280,7 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 	save_session(session)
 
 	# Record audit log
-	record_audit(
+	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.UPDATE,
 		actor='buyer_agent_sim',
@@ -265,10 +295,10 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 async def complete_checkout_session(session_id: str):
 	"""
 	Finalizes the checkout session:
-	1. Validates that the session is active (created or updated).
-	2. Creates a Razorpay Order scoped to the exact session total.
-	3. Transitions session status to 'completed' and records razorpay_order_id.
-	4. Logs immutable AuditEntry and fires simulated outbound webhook event.
+	1. Validates active status.
+	2. Creates Razorpay Order scoped to total.
+	3. Transitions session to 'completed'.
+	4. Logs AuditEntry and dispatches webhook event.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -303,17 +333,14 @@ async def complete_checkout_session(session_id: str):
 			detail=f'Failed to create payment rail order with Razorpay: {str(exc)}'
 		)
 
-	# Update session to completed state
 	now = datetime.now(timezone.utc)
 	session.payment_provider.razorpay_order_id = rzp_order['id']
 	session.status = SessionStatus.COMPLETED
 	session.updated_at = now
 
-	# Persist session
 	save_session(session)
 
-	# Record audit log
-	record_audit(
+	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.COMPLETE,
 		actor='buyer_agent_sim',
@@ -343,9 +370,7 @@ async def complete_checkout_session(session_id: str):
 async def cancel_checkout_session(session_id: str):
 	"""
 	Cancels an incomplete checkout session.
-	1. Validates that the session is not completed or already cancelled.
-	2. Transitions status to 'cancelled'.
-	3. Records immutable AuditEntry.
+	Transitions status to 'cancelled' and records AuditEntry.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -376,11 +401,9 @@ async def cancel_checkout_session(session_id: str):
 	session.status = SessionStatus.CANCELLED
 	session.updated_at = now
 
-	# Persist update
 	save_session(session)
 
-	# Record audit log
-	record_audit(
+	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.CANCEL,
 		actor='buyer_agent_sim',

@@ -337,3 +337,55 @@ async def complete_checkout_session(session_id: str):
 	logger.info(f'[ACP Webhook Stub] Dispatched event: {webhook_payload}')
 
 	return session
+
+
+@router.post('/{session_id}/cancel', response_model=CheckoutSession, summary='Cancel Checkout Session')
+async def cancel_checkout_session(session_id: str):
+	"""
+	Cancels an incomplete checkout session.
+	1. Validates that the session is not completed or already cancelled.
+	2. Transitions status to 'cancelled'.
+	3. Records immutable AuditEntry.
+	"""
+	session = get_session_by_id(session_id)
+	if not session:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	if session.status == SessionStatus.COMPLETED:
+		raise HTTPException(
+			status_code=status.HTTP_409_CONFLICT,
+			detail=f'Cannot cancel checkout session "{session_id}" because it is already completed with Razorpay order "{session.payment_provider.razorpay_order_id}".'
+		)
+
+	if session.status == SessionStatus.CANCELLED:
+		raise HTTPException(
+			status_code=status.HTTP_409_CONFLICT,
+			detail=f'Checkout session "{session_id}" is already cancelled.'
+		)
+
+	if session.status == SessionStatus.REJECTED:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Cannot cancel checkout session "{session_id}" in rejected state.'
+		)
+
+	now = datetime.now(timezone.utc)
+	session.status = SessionStatus.CANCELLED
+	session.updated_at = now
+
+	# Persist update
+	save_session(session)
+
+	# Record audit log
+	record_audit(
+		session_id=session_id,
+		action=AuditAction.CANCEL,
+		actor='buyer_agent_sim',
+		before_total=session.totals.total,
+		after_total=session.totals.total
+	)
+
+	return session

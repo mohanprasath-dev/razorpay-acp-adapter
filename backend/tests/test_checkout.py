@@ -208,3 +208,51 @@ def test_full_create_update_complete_flow():
 	assert completed['status'] == 'completed'
 	assert completed['payment_provider']['razorpay_order_id'] is not None
 	assert completed['totals']['total'] == 1177.64
+
+
+def test_cancel_checkout_session_success():
+	# 1. Create session
+	create_res = client.post('/checkout_sessions', json={
+		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
+	})
+	session_id = create_res.json()['id']
+	assert create_res.json()['status'] == 'created'
+
+	# 2. Cancel session
+	cancel_res = client.post(f'/checkout_sessions/{session_id}/cancel')
+	assert cancel_res.status_code == 200
+	cancelled_session = cancel_res.json()
+	assert cancelled_session['status'] == 'cancelled'
+
+	# 3. GET reflects cancelled state
+	get_res = client.get(f'/checkout_sessions/{session_id}')
+	assert get_res.status_code == 200
+	assert get_res.json()['status'] == 'cancelled'
+
+
+def test_cancel_completed_session_fails():
+	# 1. Create and complete session
+	create_res = client.post('/checkout_sessions', json={
+		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
+	})
+	session_id = create_res.json()['id']
+	client.post(f'/checkout_sessions/{session_id}/complete')
+
+	# 2. Attempt to cancel completed session must return 409
+	cancel_res = client.post(f'/checkout_sessions/{session_id}/cancel')
+	assert cancel_res.status_code == 409
+	assert 'already completed' in cancel_res.json()['detail'].lower()
+
+
+def test_cancel_already_cancelled_session_fails():
+	# 1. Create and cancel
+	create_res = client.post('/checkout_sessions', json={
+		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
+	})
+	session_id = create_res.json()['id']
+	client.post(f'/checkout_sessions/{session_id}/cancel')
+
+	# 2. Second cancel attempt must return 409
+	repeat_res = client.post(f'/checkout_sessions/{session_id}/cancel')
+	assert repeat_res.status_code == 409
+	assert 'already cancelled' in repeat_res.json()['detail'].lower()

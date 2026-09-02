@@ -18,6 +18,7 @@ def test_refund_completed_session_success():
 	assert create_res.status_code == 201
 	sid = create_res.json()['id']
 
+	client.post(f'/checkout_sessions/{sid}/payment_method', json={'token': 'pm_tok_test_refund_001'})
 	complete_res = client.post(f'/checkout_sessions/{sid}/complete')
 	assert complete_res.status_code == 200
 	assert complete_res.json()['status'] == 'completed'
@@ -49,6 +50,7 @@ def test_refund_duplicate_fails():
 		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
 	})
 	sid = create_res.json()['id']
+	client.post(f'/checkout_sessions/{sid}/payment_method', json={'token': 'pm_tok_test_refund_002'})
 	client.post(f'/checkout_sessions/{sid}/complete')
 
 	# First refund succeeds

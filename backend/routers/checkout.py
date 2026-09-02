@@ -23,6 +23,18 @@ from backend.services.audit import record_audit_entry, get_all_audit_entries, ge
 from backend.services.webhook import dispatch_webhook_event
 from backend.services.rate_limiter import rate_limit_dependency
 from backend.db.firestore import get_firestore_client
+from backend.services.inventory import (
+	validate_inventory_availability,
+	decrement_inventory_atomic,
+	get_stock,
+)
+from backend.services.tokenization import generate_payment_token, validate_payment_token
+from backend.services.anomaly import (
+	record_session_creation,
+	record_guardrail_violation,
+	record_spend,
+	evaluate_anomaly_score,
+)
 
 import threading
 
@@ -42,6 +54,12 @@ class RawLineItemInput(BaseModel):
 	unit_price: Optional[float] = None  # Ignored by server, looked up authoritatively
 
 
+class RawLineItemUpdateInput(BaseModel):
+	product_id: str
+	quantity: int = Field(default=1, ge=0, description='Quantity (0 removes item from cart)')
+	unit_price: Optional[float] = None
+
+
 class CreateCheckoutSessionRequest(BaseModel):
 	line_items: List[RawLineItemInput] = Field(..., min_length=1, description='List of items to purchase')
 	buyer: Optional[Buyer] = None
@@ -50,10 +68,14 @@ class CreateCheckoutSessionRequest(BaseModel):
 
 
 class UpdateCheckoutSessionRequest(BaseModel):
-	line_items: Optional[List[RawLineItemInput]] = Field(default=None, description='Updated list of line items')
+	line_items: Optional[List[RawLineItemUpdateInput]] = Field(default=None, description='Updated or patched line items')
 	buyer: Optional[Buyer] = None
 	fulfillment_address: Optional[Address] = None
 	discount: Optional[float] = Field(default=None, ge=0.0)
+
+
+class AttachPaymentMethodRequest(BaseModel):
+	token: Optional[str] = Field(default=None, description='ACP payment method token (e.g. pm_tok_<hex>)')
 
 
 class RefundCheckoutSessionRequest(BaseModel):
@@ -164,7 +186,7 @@ async def create_checkout_session(
 	Creates a new ACP Checkout Session:
 	1. Enforces idempotency via Idempotency-Key header.
 	2. Computes authoritative pricing from server catalog.
-	3. Runs deterministic guardrail rule engine (max discount, max order value, max quantity).
+	3. Validates inventory availability and deterministic guardrail rules.
 	4. Persists session and writes immutable AuditEntry for all checks (pass or reject).
 	5. Dispatches signed HMAC webhook event.
 	"""
@@ -198,8 +220,48 @@ async def create_checkout_session(
 			totals=totals,
 			discount_amount=discount_amount
 		)
+		is_guardrail_err = not passed
+
+		# Check Inventory Availability if guardrails passed
+		if passed:
+			stock_ok, stock_reason = validate_inventory_availability(authoritative_items)
+			if not stock_ok:
+				passed = False
+				reject_reason = stock_reason
+				is_guardrail_err = False
+
+		# Record and evaluate anomaly score
+		identifier = (request.buyer.email if request.buyer and request.buyer.email else f'anon_{session_id}').strip().lower()
+		record_session_creation(identifier)
+		if not passed and is_guardrail_err:
+			record_guardrail_violation(identifier)
+
+		anomaly_score, anomaly_flags, should_block = evaluate_anomaly_score(identifier, current_order_amount=totals.total)
+
+		if should_block:
+			action_type = AuditAction.FLAGGED_ANOMALOUS
+			reason_str = f'Unusual autonomous agent traffic pattern detected (Score {anomaly_score}/100: {", ".join(anomaly_flags)})'
+			record_audit_entry(
+				session_id=session_id,
+				action=action_type,
+				actor='buyer_agent_sim',
+				reason=reason_str,
+				before_total=None,
+				after_total=totals.total
+			)
+			raise HTTPException(
+				status_code=status.HTTP_400_BAD_REQUEST,
+				detail={
+					'error': 'anomaly_detected',
+					'reason': 'Unusual autonomous agent traffic pattern detected',
+					'anomaly_score': anomaly_score,
+					'flags': anomaly_flags,
+					'session_id': session_id
+				}
+			)
 
 		initial_status = SessionStatus.CREATED if passed else SessionStatus.REJECTED
+		is_flagged_anomalous = anomaly_score >= 70
 
 		session = CheckoutSession(
 			id=session_id,
@@ -209,6 +271,9 @@ async def create_checkout_session(
 			fulfillment_address=request.fulfillment_address,
 			totals=totals,
 			payment_provider=PaymentProvider(provider='razorpay', razorpay_order_id=None),
+			payment_method_token=None,
+			is_anomalous=is_flagged_anomalous,
+			anomaly_score=anomaly_score,
 			created_at=now,
 			updated_at=now
 		)
@@ -221,6 +286,16 @@ async def create_checkout_session(
 			save_idempotency_mapping(idempotency_key, session_id)
 
 		# Record audit log & dispatch webhooks
+		if is_flagged_anomalous:
+			record_audit_entry(
+				session_id=session_id,
+				action=AuditAction.FLAGGED_ANOMALOUS,
+				actor='buyer_agent_sim',
+				reason=f'Elevated anomaly score ({anomaly_score}/100): {", ".join(anomaly_flags)}',
+				before_total=None,
+				after_total=totals.total
+			)
+
 		if passed:
 			record_audit_entry(
 				session_id=session_id,
@@ -233,9 +308,10 @@ async def create_checkout_session(
 			dispatch_webhook_event('checkout_session.created', session.model_dump(mode='json'))
 			return session
 		else:
+			action_type = AuditAction.REJECT if is_guardrail_err else AuditAction.OUT_OF_STOCK
 			record_audit_entry(
 				session_id=session_id,
-				action=AuditAction.REJECT,
+				action=action_type,
 				actor='buyer_agent_sim',
 				reason=reject_reason,
 				before_total=None,
@@ -249,7 +325,7 @@ async def create_checkout_session(
 			raise HTTPException(
 				status_code=status.HTTP_400_BAD_REQUEST,
 				detail={
-					'error': 'guardrail_violation',
+					'error': 'guardrail_violation' if is_guardrail_err else 'out_of_stock',
 					'reason': reject_reason,
 					'session_id': session_id,
 					'status': 'rejected'
@@ -285,6 +361,38 @@ async def get_session_audit(session_id: str):
 	return entries
 
 
+def is_ready_for_payment(
+	buyer: Optional[Buyer],
+	fulfillment_address: Optional[Address],
+	line_items: List[LineItem],
+	payment_method_token: Optional[str] = None
+) -> bool:
+	"""
+	A session is ready_for_payment when:
+	1. Buyer info is present with valid name and email.
+	2. Fulfillment address is present with non-empty line1, city, state, postal_code, country.
+	3. Line items list is non-empty.
+	4. Delegated payment method token is attached.
+	"""
+	if not buyer or not (buyer.name and buyer.name.strip()) or not (buyer.email and buyer.email.strip()):
+		return False
+	if not fulfillment_address:
+		return False
+	if not (
+		fulfillment_address.line1 and fulfillment_address.line1.strip()
+		and fulfillment_address.city and fulfillment_address.city.strip()
+		and fulfillment_address.state and fulfillment_address.state.strip()
+		and fulfillment_address.postal_code and fulfillment_address.postal_code.strip()
+		and fulfillment_address.country and fulfillment_address.country.strip()
+	):
+		return False
+	if not line_items:
+		return False
+	if not payment_method_token:
+		return False
+	return True
+
+
 @router.post(
 	'/{session_id}',
 	response_model=CheckoutSession,
@@ -293,8 +401,11 @@ async def get_session_audit(session_id: str):
 )
 async def update_checkout_session(session_id: str, request: UpdateCheckoutSessionRequest):
 	"""
-	Updates an existing checkout session.
-	Evaluates guardrail rules on new configuration before applying.
+	Updates an existing checkout session with multi-turn cart negotiation support:
+	- Supports partial line item patches: add item, change quantity, or remove item (quantity=0).
+	- Supports applying, changing, or removing discounts (recalculating authoritative totals).
+	- Re-validates inventory availability and guardrails on every turn.
+	- Preserves session state on invalid negotiation proposals.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -303,7 +414,7 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 			detail=f'Checkout session with id "{session_id}" was not found.'
 		)
 
-	if session.status in [SessionStatus.COMPLETED, SessionStatus.REJECTED, SessionStatus.CANCELLED]:
+	if session.status in [SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.REFUNDED]:
 		raise HTTPException(
 			status_code=status.HTTP_400_BAD_REQUEST,
 			detail=f'Cannot update session "{session_id}" in terminal state "{session.status.value}".'
@@ -311,14 +422,25 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 
 	before_total = session.totals.total
 
-	# Handle line item or discount updates with authoritative pricing
-	new_line_items = session.line_items
+	# Handle multi-turn line item patches and discount updates
 	new_discount = request.discount if request.discount is not None else session.totals.discount
 
 	if request.line_items is not None:
 		if len(request.line_items) == 0:
 			raise HTTPException(status_code=400, detail='line_items array cannot be empty on update.')
-		raw_items = [item.model_dump() for item in request.line_items]
+		
+		# Merge patch into current cart items map
+		items_map: Dict[str, int] = {item.product_id: item.quantity for item in session.line_items}
+		for item_patch in request.line_items:
+			if item_patch.quantity == 0:
+				items_map.pop(item_patch.product_id, None)
+			else:
+				items_map[item_patch.product_id] = item_patch.quantity
+		
+		if not items_map:
+			raise HTTPException(status_code=400, detail='line_items cannot be empty. At least one product must remain in cart.')
+
+		raw_items = [{'product_id': pid, 'quantity': q} for pid, q in items_map.items()]
 		authoritative_items, totals = compute_authoritative_totals(
 			raw_items=raw_items,
 			discount_amount=new_discount
@@ -330,7 +452,9 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 			raw_items=raw_items,
 			discount_amount=new_discount
 		)
+		new_line_items = session.line_items
 	else:
+		new_line_items = session.line_items
 		totals = session.totals
 
 	# Evaluate Guardrails for update
@@ -339,6 +463,15 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 		totals=totals,
 		discount_amount=new_discount
 	)
+	is_guardrail_err = not passed
+
+	# Check Inventory Availability for update if guardrails passed
+	if passed:
+		stock_ok, stock_reason = validate_inventory_availability(new_line_items)
+		if not stock_ok:
+			passed = False
+			reject_reason = stock_reason
+			is_guardrail_err = False
 
 	now = datetime.now(timezone.utc)
 	new_buyer = request.buyer if request.buyer is not None else session.buyer
@@ -349,9 +482,10 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 		session.updated_at = now
 		save_session(session)
 
+		action_type = AuditAction.REJECT if is_guardrail_err else AuditAction.OUT_OF_STOCK
 		record_audit_entry(
 			session_id=session_id,
-			action=AuditAction.REJECT,
+			action=action_type,
 			actor='buyer_agent_sim',
 			reason=reject_reason,
 			before_total=before_total,
@@ -361,7 +495,7 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 		raise HTTPException(
 			status_code=status.HTTP_400_BAD_REQUEST,
 			detail={
-				'error': 'guardrail_violation',
+				'error': 'guardrail_violation' if is_guardrail_err else 'out_of_stock',
 				'reason': reject_reason,
 				'session_id': session_id,
 				'status': 'rejected'
@@ -373,7 +507,7 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 	session.buyer = new_buyer
 	session.fulfillment_address = new_address
 	session.totals = totals
-	session.status = SessionStatus.UPDATED
+	session.status = SessionStatus.READY_FOR_PAYMENT if is_ready_for_payment(new_buyer, new_address, new_line_items, session.payment_method_token) else SessionStatus.UPDATED
 	session.updated_at = now
 
 	# Persist update
@@ -392,6 +526,59 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 
 
 @router.post(
+	'/{session_id}/payment_method',
+	response_model=CheckoutSession,
+	dependencies=[Depends(rate_limit_dependency)],
+	summary='Attach Delegated Payment Method Token'
+)
+async def attach_payment_method(session_id: str, request: Optional[AttachPaymentMethodRequest] = None):
+	"""
+	Attaches a delegated payment method token to the checkout session per ACP spec.
+	Validates token format (pm_tok_...) or generates a stub token if not provided.
+	Transitions session status to 'ready_for_payment' once buyer, address, items, and token are present.
+	"""
+	session = get_session_by_id(session_id)
+	if not session:
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	if session.status in [SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.REFUNDED]:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Cannot attach payment method to session "{session_id}" in terminal state "{session.status.value}".'
+		)
+
+	token = request.token if request and request.token else generate_payment_token()
+	if not validate_payment_token(token):
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Invalid payment method token format: "{token}". Expected format "pm_tok_<identifier>".'
+		)
+
+	session.payment_method_token = token
+	now = datetime.now(timezone.utc)
+	session.updated_at = now
+
+	if is_ready_for_payment(session.buyer, session.fulfillment_address, session.line_items, session.payment_method_token):
+		session.status = SessionStatus.READY_FOR_PAYMENT
+
+	save_session(session)
+
+	record_audit_entry(
+		session_id=session_id,
+		action=AuditAction.ATTACH_PAYMENT_METHOD,
+		actor='buyer_agent_sim',
+		reason=f'Attached delegated payment token {token[:16]}...',
+		before_total=session.totals.total,
+		after_total=session.totals.total
+	)
+
+	return session
+
+
+@router.post(
 	'/{session_id}/complete',
 	response_model=CheckoutSession,
 	dependencies=[Depends(rate_limit_dependency)],
@@ -400,10 +587,11 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 async def complete_checkout_session(session_id: str):
 	"""
 	Finalizes the checkout session:
-	1. Validates active status.
-	2. Creates Razorpay Order scoped to total.
-	3. Transitions session to 'completed'.
-	4. Logs AuditEntry and dispatches signed HMAC webhook event.
+	1. Validates active status and attached payment method token.
+	2. Atomically decrements catalog inventory.
+	3. Creates Razorpay Order scoped to total.
+	4. Transitions session to 'completed'.
+	5. Logs AuditEntry and dispatches signed HMAC webhook event.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -422,6 +610,45 @@ async def complete_checkout_session(session_id: str):
 		raise HTTPException(
 			status_code=status.HTTP_400_BAD_REQUEST,
 			detail=f'Cannot complete checkout session "{session_id}" in terminal state "{session.status.value}".'
+		)
+
+	# Verify delegated payment method token is attached
+	if not session.payment_method_token:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail=f'Cannot complete checkout session "{session_id}": missing delegated payment method token. Call POST /checkout_sessions/{session_id}/payment_method first.'
+		)
+
+	if session.status in [SessionStatus.CREATED, SessionStatus.UPDATED]:
+		logger.warning(
+			f'Session {session_id} completed directly from state "{session.status.value}" '
+			'without explicit ready_for_payment transition.'
+		)
+
+	# Atomically decrement inventory
+	decremented, decr_reason = decrement_inventory_atomic(session.line_items)
+	if not decremented:
+		session.status = SessionStatus.REJECTED
+		session.updated_at = datetime.now(timezone.utc)
+		save_session(session)
+
+		record_audit_entry(
+			session_id=session_id,
+			action=AuditAction.OUT_OF_STOCK,
+			actor='buyer_agent_sim',
+			reason=decr_reason,
+			before_total=session.totals.total,
+			after_total=session.totals.total
+		)
+
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail={
+				'error': 'out_of_stock',
+				'reason': decr_reason,
+				'session_id': session_id,
+				'status': 'rejected'
+			}
 		)
 
 	# Create real Razorpay test-mode Order scoped to total

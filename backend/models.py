@@ -22,6 +22,9 @@ class AuditAction(str, Enum):
 	REFUND = 'refund'
 	REJECT = 'reject'
 	CANCEL = 'cancel'
+	OUT_OF_STOCK = 'out_of_stock'
+	ATTACH_PAYMENT_METHOD = 'attach_payment_method'
+	FLAGGED_ANOMALOUS = 'flagged_anomalous'
 
 
 class LineItem(BaseModel):
@@ -36,6 +39,7 @@ class Product(BaseModel):
 	price: float = Field(ge=0.0, description='Price must be non-negative')
 	currency: str = Field(default='INR', min_length=3, max_length=3)
 	description: str
+	stock: int = Field(default=100, ge=0, description='Available inventory stock quantity')
 
 
 class Buyer(BaseModel):
@@ -83,6 +87,9 @@ class CheckoutSession(BaseModel):
 	fulfillment_address: Optional[Address] = None
 	totals: Totals
 	payment_provider: PaymentProvider = Field(default_factory=PaymentProvider)
+	payment_method_token: Optional[str] = None
+	is_anomalous: bool = False
+	anomaly_score: Optional[int] = 0
 	created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 	updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -99,7 +106,18 @@ class AuditEntry(BaseModel):
 
 	@model_validator(mode='after')
 	def validate_reject_reason(self) -> 'AuditEntry':
-		if self.action == AuditAction.REJECT:
+		if self.action in [AuditAction.REJECT, AuditAction.OUT_OF_STOCK, AuditAction.FLAGGED_ANOMALOUS]:
 			if not self.reason or not self.reason.strip():
-				raise ValueError('Reason is required when action is "reject"')
+				raise ValueError('Reason is required when action is "reject", "out_of_stock", or "flagged_anomalous"')
 		return self
+
+
+class DeadLetterEvent(BaseModel):
+	id: str
+	event_type: str
+	session_id: Optional[str] = None
+	target_url: str
+	last_error: str
+	attempts: int = 3
+	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+

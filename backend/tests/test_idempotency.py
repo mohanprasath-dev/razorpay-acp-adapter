@@ -90,6 +90,7 @@ def test_no_duplicate_razorpay_orders_on_repeat_complete():
 	})
 	session_id = create_res.json()['id']
 
+	client.post(f'/checkout_sessions/{session_id}/payment_method', json={'token': 'pm_tok_test_idemp_001'})
 	complete_res1 = client.post(f'/checkout_sessions/{session_id}/complete')
 	assert complete_res1.status_code == 200
 	order_id_1 = complete_res1.json()['payment_provider']['razorpay_order_id']

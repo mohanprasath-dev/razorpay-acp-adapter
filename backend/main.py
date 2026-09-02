@@ -12,6 +12,11 @@ app = FastAPI(
 	version=settings.ACP_SPEC_VERSION,
 )
 
+from backend.middleware.correlation import CorrelationIdMiddleware
+
+# Mount Correlation ID middleware first so all downstream handlers & CORS have correlation headers
+app.add_middleware(CorrelationIdMiddleware)
+
 # Setup CORS for Frontend dashboard
 app.add_middleware(
 	CORSMiddleware,
@@ -19,6 +24,7 @@ app.add_middleware(
 	allow_credentials=True,
 	allow_methods=['*'],
 	allow_headers=['*'],
+	expose_headers=['X-Correlation-Id'],
 )
 
 # Include Routers
@@ -27,8 +33,9 @@ app.include_router(checkout.router)
 
 
 from typing import List
-from backend.models import AuditEntry
+from backend.models import AuditEntry, DeadLetterEvent
 from backend.services.audit import get_all_audit_entries
+from backend.services.webhook import get_dead_letter_events
 
 @app.get('/health', tags=['Health'])
 async def health_check():
@@ -40,6 +47,12 @@ async def health_check():
 async def get_global_audit_trail():
 	"""Global immutable audit trail across all checkout sessions."""
 	return get_all_audit_entries()
+
+
+@app.get('/dead_letter_events', response_model=List[DeadLetterEvent], tags=['Webhooks'])
+async def get_all_dead_letter_events():
+	"""Lists all dead-lettered webhook dispatch events that failed after max retry attempts."""
+	return get_dead_letter_events()
 
 
 if __name__ == '__main__':

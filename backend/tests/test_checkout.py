@@ -154,6 +154,9 @@ def test_complete_checkout_session_success():
 	session_id = create_res.json()['id']
 	assert create_res.json()['payment_provider']['razorpay_order_id'] is None
 
+	# Attach payment method
+	client.post(f'/checkout_sessions/{session_id}/payment_method', json={'token': 'pm_tok_test_checkout_001'})
+
 	# 2. Complete session
 	complete_res = client.post(f'/checkout_sessions/{session_id}/complete')
 	assert complete_res.status_code == 200
@@ -177,6 +180,7 @@ def test_complete_already_completed_session_fails():
 		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
 	})
 	session_id = create_res.json()['id']
+	client.post(f'/checkout_sessions/{session_id}/payment_method', json={'token': 'pm_tok_test_checkout_002'})
 	client.post(f'/checkout_sessions/{session_id}/complete')
 
 	# Second complete attempt must return 400
@@ -201,7 +205,8 @@ def test_full_create_update_complete_flow():
 	assert update_res.json()['status'] == 'updated'
 	assert update_res.json()['totals']['subtotal'] == 998.0
 
-	# 3. Complete session
+	# 3. Attach payment method & Complete session
+	client.post(f'/checkout_sessions/{session_id}/payment_method', json={'token': 'pm_tok_test_checkout_003'})
 	complete_res = client.post(f'/checkout_sessions/{session_id}/complete')
 	assert complete_res.status_code == 200
 	completed = complete_res.json()
@@ -236,6 +241,7 @@ def test_cancel_completed_session_fails():
 		'line_items': [{'product_id': 'prod_bolt_001', 'quantity': 1}]
 	})
 	session_id = create_res.json()['id']
+	client.post(f'/checkout_sessions/{session_id}/payment_method', json={'token': 'pm_tok_test_checkout_004'})
 	client.post(f'/checkout_sessions/{session_id}/complete')
 
 	# 2. Attempt to cancel completed session must return 409

@@ -27,6 +27,7 @@ def test_integration_pass_multi_run_isolation():
 	assert update_res_1.status_code == 200
 	assert update_res_1.json()['totals']['subtotal'] == 998.0
 
+	client.post(f'/checkout_sessions/{sess1_id}/payment_method', json={'token': 'pm_tok_test_integ_001'})
 	complete_res_1 = client.post(f'/checkout_sessions/{sess1_id}/complete')
 	assert complete_res_1.status_code == 200
 	assert complete_res_1.json()['status'] == 'completed'
@@ -34,8 +35,8 @@ def test_integration_pass_multi_run_isolation():
 
 	# Verify Flow 1 Audit Trail
 	audits_1 = get_session_audit_entries(sess1_id)
-	assert len(audits_1) == 3
-	assert [a.action for a in audits_1] == [AuditAction.CREATE, AuditAction.UPDATE, AuditAction.COMPLETE]
+	assert len(audits_1) == 4
+	assert [a.action for a in audits_1] == [AuditAction.CREATE, AuditAction.UPDATE, AuditAction.ATTACH_PAYMENT_METHOD, AuditAction.COMPLETE]
 
 	# Flow 2: Independent Create -> Cancel (Must not be affected by Flow 1)
 	create_res_2 = client.post('/checkout_sessions', json={
@@ -96,6 +97,12 @@ def test_all_seven_endpoints_reachability():
 		'discount': 50.0
 	})
 	assert res5.status_code == 200
+
+	# Attach payment method
+	res_pm = client.post(f'/checkout_sessions/{sid}/payment_method', json={
+		'token': 'pm_tok_test_integ_002'
+	})
+	assert res_pm.status_code == 200
 
 	# 6. POST /checkout_sessions/{id}/complete
 	res6 = client.post(f'/checkout_sessions/{sid}/complete')

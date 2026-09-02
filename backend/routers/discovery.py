@@ -7,42 +7,49 @@ from backend.models import Product
 router = APIRouter(tags=['Discovery'])
 settings = get_settings()
 
-# Default catalog SKUs (5 rich products)
+from backend.services.inventory import get_stock
+
+# Default catalog SKUs (5 rich products with stock tracking)
 CATALOG: List[Product] = [
 	Product(
 		id='prod_bolt_001',
 		name='Autonomous Agent Run Credit (100k Tokens)',
 		price=499.0,
 		currency='INR',
-		description='High-throughput inference credit package for AI agent execution workflows.'
+		description='High-throughput inference credit package for AI agent execution workflows.',
+		stock=100
 	),
 	Product(
 		id='prod_bolt_002',
 		name='TaskDrift Pro Website Audit & Optimization',
 		price=4999.0,
 		currency='INR',
-		description='Comprehensive Lighthouse, SEO, and Three.js performance tuning package.'
+		description='Comprehensive Lighthouse, SEO, and Three.js performance tuning package.',
+		stock=2
 	),
 	Product(
 		id='prod_bolt_003',
 		name='Custom GLSL Shader & WebGL Experience Pack',
 		price=9999.0,
 		currency='INR',
-		description='Production-ready custom procedural shaders, bloom filters, and particle system bundle.'
+		description='Production-ready custom procedural shaders, bloom filters, and particle system bundle.',
+		stock=15
 	),
 	Product(
 		id='prod_bolt_004',
 		name='Razorpay Gateway Integration & Webhook Kit',
 		price=2499.0,
 		currency='INR',
-		description='Enterprise payment rail bridge with backoff retry and idempotent order handlers.'
+		description='Enterprise payment rail bridge with backoff retry and idempotent order handlers.',
+		stock=30
 	),
 	Product(
 		id='prod_bolt_005',
 		name='AI Commerce Agent Protocol Adapter License',
 		price=14999.0,
 		currency='INR',
-		description='Full commercial deployment license for ACP-compliant bounded checkout adapter.'
+		description='Full commercial deployment license for ACP-compliant bounded checkout adapter.',
+		stock=10
 	),
 ]
 
@@ -101,6 +108,7 @@ async def get_products():
 	"""
 	Returns the unauthenticated product catalog available for buyer agents.
 	Fetches from Firestore if available, otherwise falls back to the seeded in-memory/disk catalog.
+	Reflects live available stock.
 	"""
 	db = get_firestore_client()
 	if db is not None:
@@ -112,4 +120,10 @@ async def get_products():
 		except Exception:
 			pass
 
-	return CATALOG
+	# Enrich CATALOG with live in-memory stock
+	live_products = []
+	for p in CATALOG:
+		p_dict = p.model_dump()
+		p_dict['stock'] = get_stock(p.id)
+		live_products.append(Product(**p_dict))
+	return live_products

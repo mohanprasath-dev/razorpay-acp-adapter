@@ -127,7 +127,7 @@ def run_act_1_discovery(base_url: str, pause: float):
 
 
 def run_act_2_happy_path(base_url: str, products: list, pause: float):
-	log_act(2, 'Happy Path Checkout Lifecycle')
+	log_act(2, 'Happy Path Checkout Lifecycle & Multi-Turn Negotiation')
 	p1, p2 = products[0], products[3]
 
 	# Step 2.1: Create Session
@@ -149,22 +149,62 @@ def run_act_2_happy_path(base_url: str, products: list, pause: float):
 	log_success(f'Session {session_id} created. Authoritative Total: ₹{session["totals"]["total"]}')
 	time.sleep(pause)
 
-	# Step 2.2: Update Session
-	log_step('2.2', 'Update Cart & Apply Merchant-Bound Discount', 'Agent updates line items and applies ₹100 discount')
-	update_payload = {
+	# Step 2.2a: Multi-Turn Turn 1 - Add item & change quantity
+	log_step('2.2a', 'Cart Negotiation Turn 1: Add Item & Modify Quantity', f'Agent adds {p2["name"]} and increases {p1["name"]} quantity to 2')
+	turn1_payload = {
 		'line_items': [
 			{'product_id': p1['id'], 'quantity': 2},
 			{'product_id': p2['id'], 'quantity': 1}
-		],
-		'discount': 100.0
+		]
 	}
-	res = http_request(f'{base_url}/checkout_sessions/{session_id}', method='POST', data=update_payload)
-	if res['status_code'] != 200:
-		log_error(f'Update session failed: {res["data"]}')
+	res_t1 = http_request(f'{base_url}/checkout_sessions/{session_id}', method='POST', data=turn1_payload)
+	if res_t1['status_code'] != 200:
+		log_error(f'Turn 1 update failed: {res_t1["data"]}')
 		sys.exit(1)
-	updated = res['data']
-	log_payload('Updated Checkout Session', updated)
-	log_success(f'Session {session_id} updated. New Total: ₹{updated["totals"]["total"]} (includes ₹{updated["totals"]["tax"]} GST)')
+	log_payload('Cart Negotiation Turn 1 Result', res_t1['data'])
+	log_success(f'Turn 1 OK. New Subtotal: ₹{res_t1["data"]["totals"]["subtotal"]} | Total: ₹{res_t1["data"]["totals"]["total"]}')
+	time.sleep(pause)
+
+	# Step 2.2b: Multi-Turn Turn 2 - Apply merchant discount
+	log_step('2.2b', 'Cart Negotiation Turn 2: Apply Discount', 'Agent applies ₹100 merchant-bound promotional discount')
+	turn2_payload = {'discount': 100.0}
+	res_t2 = http_request(f'{base_url}/checkout_sessions/{session_id}', method='POST', data=turn2_payload)
+	if res_t2['status_code'] != 200:
+		log_error(f'Turn 2 update failed: {res_t2["data"]}')
+		sys.exit(1)
+	log_payload('Cart Negotiation Turn 2 Result', res_t2['data'])
+	log_success(f'Turn 2 OK. New Discount: ₹{res_t2["data"]["totals"]["discount"]} | Total: ₹{res_t2["data"]["totals"]["total"]}')
+	time.sleep(pause)
+
+	# Step 2.2c: Multi-Turn Turn 3 - Provide fulfillment address
+	log_step('2.2c', 'Cart Negotiation Turn 3: Set Fulfillment Address', 'Agent provides full shipping and delivery address')
+	turn3_payload = {
+		'fulfillment_address': {
+			'line1': 'Prestige Tech Cloud, Block 2',
+			'city': 'Bengaluru',
+			'state': 'Karnataka',
+			'postal_code': '560103',
+			'country': 'IN'
+		}
+	}
+	res_t3 = http_request(f'{base_url}/checkout_sessions/{session_id}', method='POST', data=turn3_payload)
+	if res_t3['status_code'] != 200:
+		log_error(f'Turn 3 update failed: {res_t3["data"]}')
+		sys.exit(1)
+	log_payload('Cart Negotiation Turn 3 Result', res_t3['data'])
+	log_success('Turn 3 OK. Fulfillment address confirmed.')
+	time.sleep(pause)
+
+	# Step 2.2d: Delegated Payment Method Tokenization
+	log_step('2.2d', 'Delegated Payment Token Handoff', 'Agent attaches delegated ACP payment method token (pm_tok_...)')
+	pm_payload = {'token': f'pm_tok_{uuid.uuid4().hex[:16]}'}
+	res_pm = http_request(f'{base_url}/checkout_sessions/{session_id}/payment_method', method='POST', data=pm_payload)
+	if res_pm['status_code'] != 200:
+		log_error(f'Attach payment method failed: {res_pm["data"]}')
+		sys.exit(1)
+	pm_session = res_pm['data']
+	log_payload('Session Ready for Payment', pm_session)
+	log_success(f'Payment Method Attached: {pm_session["payment_method_token"]} | Status: {pm_session["status"]}')
 	time.sleep(pause)
 
 	# Step 2.3: Complete Session
@@ -219,14 +259,22 @@ def run_act_3_attack_suite(base_url: str, products: list, pause: float):
 	time.sleep(pause)
 
 	# Step 3.2: Recovery
-	log_step('3.2', 'Graceful Recovery Flow', 'Agent corrects cart within merchant bounds and finalizes purchase')
+	log_step('3.2', 'Graceful Recovery Flow', 'Agent corrects cart within merchant bounds, attaches token and finalizes purchase')
 	compliant_payload = {
 		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
 		'discount': 50.0,
-		'buyer': {'name': 'Recovered Agent Buyer', 'email': 'recovered@taskdrift.internal'}
+		'buyer': {'name': 'Recovered Agent Buyer', 'email': 'recovered@taskdrift.internal'},
+		'fulfillment_address': {
+			'line1': 'Recovery Suite 101',
+			'city': 'Mumbai',
+			'state': 'Maharashtra',
+			'postal_code': '400001',
+			'country': 'IN'
+		}
 	}
 	res_fresh = http_request(f'{base_url}/checkout_sessions', method='POST', data=compliant_payload)
 	fresh_sid = res_fresh['data']['id']
+	http_request(f'{base_url}/checkout_sessions/{fresh_sid}/payment_method', method='POST', data={'token': f'pm_tok_{uuid.uuid4().hex[:16]}'})
 	res_comp = http_request(f'{base_url}/checkout_sessions/{fresh_sid}/complete', method='POST')
 	log_success(f'Recovery Complete! Fresh Session {fresh_sid} finalized with Razorpay Order ID: {BOLD}{res_comp["data"]["payment_provider"]["razorpay_order_id"]}{RESET}')
 	time.sleep(pause)
@@ -266,8 +314,13 @@ def run_act_4_resilience_and_lifecycle(base_url: str, products: list, pause: flo
 	# 4C: Post-Payment Refund
 	log_step('4C', 'Post-Payment Refund Bridge', 'Executing post-completion refund via Razorpay refund bridge')
 	# Create and complete a session
-	res_c = http_request(f'{base_url}/checkout_sessions', method='POST', data={'line_items': [{'product_id': p1['id'], 'quantity': 1}]})
+	res_c = http_request(f'{base_url}/checkout_sessions', method='POST', data={
+		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
+		'buyer': {'name': 'Refund Buyer', 'email': 'buyer@taskdrift.internal'},
+		'fulfillment_address': {'line1': '101 Refund Way', 'city': 'Chennai', 'state': 'TN', 'postal_code': '600001', 'country': 'IN'}
+	})
 	sid_c = res_c['data']['id']
+	http_request(f'{base_url}/checkout_sessions/{sid_c}/payment_method', method='POST', data={'token': f'pm_tok_{uuid.uuid4().hex[:16]}'})
 	http_request(f'{base_url}/checkout_sessions/{sid_c}/complete', method='POST')
 
 	# Issue refund

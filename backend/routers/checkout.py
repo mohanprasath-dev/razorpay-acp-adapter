@@ -22,6 +22,8 @@ from backend.services.razorpay_service import create_order
 from backend.services.audit import record_audit_entry, get_all_audit_entries, get_session_audit_entries
 from backend.db.firestore import get_firestore_client
 
+import threading
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/checkout_sessions', tags=['Checkout Sessions'])
@@ -29,6 +31,7 @@ router = APIRouter(prefix='/checkout_sessions', tags=['Checkout Sessions'])
 # In-memory session store & idempotency cache for local/offline testing
 _sessions_store: Dict[str, CheckoutSession] = {}
 _idempotency_store: Dict[str, str] = {}
+_idempotency_lock = threading.Lock()
 
 
 class RawLineItemInput(BaseModel):
@@ -81,6 +84,40 @@ def get_session_by_id(session_id: str) -> Optional[CheckoutSession]:
 	return None
 
 
+def get_idempotency_session_id(key: str) -> Optional[str]:
+	"""Looks up existing session mapped to idempotency key in memory or Firestore."""
+	if key in _idempotency_store:
+		return _idempotency_store[key]
+
+	db = get_firestore_client()
+	if db is not None:
+		try:
+			doc = db.collection('idempotency_keys').document(key).get()
+			if doc.exists:
+				session_id = doc.to_dict().get('session_id')
+				if session_id:
+					_idempotency_store[key] = session_id
+					return session_id
+		except Exception:
+			pass
+	return None
+
+
+def save_idempotency_mapping(key: str, session_id: str):
+	"""Saves idempotency key mapping in memory and Firestore."""
+	_idempotency_store[key] = session_id
+	db = get_firestore_client()
+	if db is not None:
+		try:
+			db.collection('idempotency_keys').document(key).set({
+				'key': key,
+				'session_id': session_id,
+				'created_at': datetime.now(timezone.utc).isoformat()
+			})
+		except Exception:
+			pass
+
+
 @router.post('', status_code=status.HTTP_201_CREATED, response_model=CheckoutSession, summary='Create Checkout Session')
 async def create_checkout_session(
 	request: CreateCheckoutSessionRequest,
@@ -95,8 +132,8 @@ async def create_checkout_session(
 	"""
 	# Check Idempotency Key
 	if idempotency_key:
-		if idempotency_key in _idempotency_store:
-			existing_session_id = _idempotency_store[idempotency_key]
+		existing_session_id = get_idempotency_session_id(idempotency_key)
+		if existing_session_id:
 			existing_session = get_session_by_id(existing_session_id)
 			if existing_session:
 				return existing_session
@@ -142,7 +179,7 @@ async def create_checkout_session(
 
 	# Store idempotency key mapping
 	if idempotency_key:
-		_idempotency_store[idempotency_key] = session_id
+		save_idempotency_mapping(idempotency_key, session_id)
 
 	# Record audit log
 	if passed:

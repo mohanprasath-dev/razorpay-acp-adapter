@@ -28,6 +28,14 @@ class LineItem(BaseModel):
 	unit_price: float = Field(ge=0.0, description='Unit price must be non-negative')
 
 
+class Product(BaseModel):
+	id: str
+	name: str
+	price: float = Field(ge=0.0, description='Price must be non-negative')
+	currency: str = Field(default='INR', min_length=3, max_length=3)
+	description: str
+
+
 class Buyer(BaseModel):
 	name: str
 	email: str

@@ -9,6 +9,8 @@ This document details the architectural layout, component interactions, determin
 
 ## 1. High-Level System Architecture
 
+![System Architecture Diagram](images/architecture-system.png)
+
 ```mermaid
 flowchart TD
     subgraph BuyerAgent["Autonomous Buyer Agent Ecosystem"]
@@ -57,6 +59,8 @@ flowchart TD
 ---
 
 ## 2. Checkout Session Deterministic State Machine (FSM)
+
+![Checkout Session FSM](images/architecture-fsm.png)
 
 The checkout session implements a deterministic finite state machine (FSM) with atomic transitions and explicit intermediate states:
 

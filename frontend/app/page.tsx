@@ -20,6 +20,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import AgentNeuralCanvas from '@/components/AgentNeuralCanvas';
 import ProtocolPlayground from '@/components/ProtocolPlayground';
+import ArchitectureSection from '@/components/ArchitectureSection';
 import { API_BASE_URL } from '@/lib/api';
 
 export default function LandingPage() {
@@ -193,7 +194,7 @@ const session = await client.checkout.createSession({
 			</section>
 
 			{/* Section: The Problem and Solution (Single Column Before/After Table) */}
-			<section id="problem-solution" className="py-24 max-w-5xl mx-auto px-6 space-y-12">
+			<section id="problem-solution" className="py-24 max-w-5xl mx-auto px-6 space-y-12 scroll-mt-24 md:scroll-mt-28">
 				<div className="space-y-3">
 					<div className="font-mono text-xs uppercase tracking-wider text-[#0F5E56] font-semibold">
 						Architectural Rationale
@@ -311,7 +312,7 @@ const session = await client.checkout.createSession({
 			</section>
 
 			{/* Section: Architectural Pillars (Asymmetric Editorial Layout with 01, 02, 03, 04) */}
-			<section id="pillars" className="py-24 border-y border-[#E8E5DF] bg-[#FAF9F6]">
+			<section id="pillars" className="py-24 border-y border-[#E8E5DF] bg-[#FAF9F6] scroll-mt-24 md:scroll-mt-28">
 				<div className="max-w-7xl mx-auto px-6 space-y-16">
 					<div className="space-y-3 max-w-2xl">
 						<div className="font-mono text-xs uppercase tracking-wider text-[#0F5E56] font-semibold">
@@ -431,7 +432,7 @@ const session = await client.checkout.createSession({
 			</section>
 
 			{/* Section: Interactive Protocol Playground */}
-			<section id="playground" className="py-24 max-w-7xl mx-auto px-6 space-y-8">
+			<section id="playground" className="py-24 max-w-7xl mx-auto px-6 space-y-8 scroll-mt-24 md:scroll-mt-28">
 				<div className="space-y-3 max-w-2xl">
 					<div className="font-mono text-xs uppercase tracking-wider text-[#0F5E56] font-semibold">
 						Protocol Sandbox Simulator
@@ -449,24 +450,33 @@ const session = await client.checkout.createSession({
 			</section>
 
 			{/* Section: Finite State Machine (FSM) Lifecycle */}
-			<section id="lifecycle" className="py-24 border-y border-[#E8E5DF] bg-[#FAF9F6]">
+			<section id="lifecycle" className="py-24 border-y border-[#E8E5DF] bg-[#FAF9F6] scroll-mt-24 md:scroll-mt-28">
 				<div className="max-w-7xl mx-auto px-6 space-y-12">
-					<div className="space-y-3 max-w-2xl">
-						<div className="font-mono text-xs uppercase tracking-wider text-[#0F5E56] font-semibold">
-							Session Lifecycle Architecture
+					<div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+						<div className="space-y-3 max-w-2xl">
+							<div className="font-mono text-xs uppercase tracking-wider text-[#0F5E56] font-semibold flex items-center gap-2">
+								<span className="w-2 h-2 rounded-full bg-[#0F5E56]" />
+								Session Lifecycle Architecture
+							</div>
+							<h2 className="text-3xl sm:text-4xl font-serif font-bold text-[#141210] tracking-tight">
+								Deterministic Finite State Machine (FSM)
+							</h2>
+							<p className="text-sm text-[#5C5852] leading-relaxed font-normal">
+								Checkout sessions transition strictly through deterministic states. Completed, rejected, refunded, and
+								cancelled states are terminal and cryptographically locked against further mutations.
+							</p>
 						</div>
-						<h2 className="text-3xl sm:text-4xl font-serif font-bold text-[#141210] tracking-tight">
-							Deterministic Finite State Machine (FSM)
-						</h2>
-						<p className="text-sm text-[#5C5852] leading-relaxed font-normal">
-							Checkout sessions transition strictly through deterministic states. Completed, rejected, refunded, and
-							cancelled states are terminal and cryptographically locked against further mutations.
-						</p>
+
+						<div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#E6F0EE] border border-[#C5D8D4] text-[#0F5E56] text-xs font-mono font-medium self-start md:self-end">
+							<span className="font-semibold">Linear Happy Path:</span>
+							<span>01 ▶ 02 ▶ 03 ▶ 04</span>
+						</div>
 					</div>
 
-					{/* Step sequence */}
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-						<div className="p-6 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-3">
+					{/* Step sequence: Connected Linear Pipeline */}
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 relative">
+						{/* Step 01 */}
+						<div className="relative p-6 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-3">
 							<div className="flex items-center justify-between text-xs font-mono">
 								<span className="text-[#0F5E56] font-bold">STATE 01</span>
 								<span className="px-2 py-0.5 rounded bg-[#E6F0EE] text-[#0F5E56] border border-[#C5D8D4] font-semibold">
@@ -477,22 +487,38 @@ const session = await client.checkout.createSession({
 							<p className="text-xs text-[#5C5852] leading-relaxed font-normal">
 								Authoritative totals calculated. 30-min TTL timestamp assigned. Soft-hold inventory reserved.
 							</p>
+							<div className="pt-2 text-[11px] font-mono text-[#0F5E56] font-medium flex items-center gap-1">
+								<span>✦ Stock soft-locked</span>
+							</div>
+							{/* Connector Arrow for Desktop */}
+							<div className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white border border-[#C5D8D4] items-center justify-center text-[#0F5E56] shadow-sm">
+								<ArrowRight className="w-3 h-3" />
+							</div>
 						</div>
 
-						<div className="p-6 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-3">
+						{/* Step 02 */}
+						<div className="relative p-6 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-3">
 							<div className="flex items-center justify-between text-xs font-mono">
 								<span className="text-[#141210] font-bold">STATE 02</span>
 								<span className="px-2 py-0.5 rounded bg-[#F4F1EC] text-[#141210] border border-[#E8E5DF] font-semibold">
 									updated
 								</span>
 							</div>
-							<h4 className="text-sm font-bold text-[#141210]">Negotiation and Patching</h4>
+							<h4 className="text-sm font-bold text-[#141210]">Negotiation &amp; Patching</h4>
 							<p className="text-xs text-[#5C5852] leading-relaxed font-normal">
 								Agent modifies item quantities or applies coupon codes. Guardrail bounds re-evaluated on each turn.
 							</p>
+							<div className="pt-2 text-[11px] font-mono text-[#5C5852] font-medium flex items-center gap-1">
+								<span>✦ Bounds re-checked</span>
+							</div>
+							{/* Connector Arrow for Desktop */}
+							<div className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white border border-[#E8E5DF] items-center justify-center text-[#5C5852] shadow-sm">
+								<ArrowRight className="w-3 h-3" />
+							</div>
 						</div>
 
-						<div className="p-6 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-3">
+						{/* Step 03 */}
+						<div className="relative p-6 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-3">
 							<div className="flex items-center justify-between text-xs font-mono">
 								<span className="text-[#141210] font-bold">STATE 03</span>
 								<span className="px-2 py-0.5 rounded bg-[#F4F1EC] text-[#141210] border border-[#E8E5DF] font-semibold">
@@ -503,40 +529,60 @@ const session = await client.checkout.createSession({
 							<p className="text-xs text-[#5C5852] leading-relaxed font-normal">
 								Full shipping address provided. Agent attaches delegated token (pm_tok_*).
 							</p>
+							<div className="pt-2 text-[11px] font-mono text-[#5C5852] font-medium flex items-center gap-1">
+								<span>✦ Address locked</span>
+							</div>
+							{/* Connector Arrow for Desktop */}
+							<div className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white border border-[#C5D8D4] items-center justify-center text-[#0F5E56] shadow-sm">
+								<ArrowRight className="w-3 h-3" />
+							</div>
 						</div>
 
-						<div className="p-6 rounded-xl bg-white border-2 border-[#0F5E56] shadow-bridge space-y-3">
+						{/* Step 04 */}
+						<div className="relative p-6 rounded-xl bg-white border-2 border-[#0F5E56] shadow-bridge space-y-3">
 							<div className="flex items-center justify-between text-xs font-mono">
 								<span className="text-[#0F5E56] font-bold">STATE 04</span>
 								<span className="px-2 py-0.5 rounded bg-[#0F5E56] text-white font-semibold">
 									completed
 								</span>
 							</div>
-							<h4 className="text-sm font-bold text-[#141210]">Razorpay Order Bridged</h4>
+							<h4 className="text-sm font-bold text-[#141210]">Razorpay Order Settled</h4>
 							<p className="text-xs text-[#5C5852] leading-relaxed font-normal">
 								Inventory committed. Razorpay order created (order_*). Immutable audit entry written.
 							</p>
+							<div className="pt-2 text-[11px] font-mono text-[#0F5E56] font-semibold flex items-center gap-1">
+								<span>✓ Settled on Razorpay</span>
+							</div>
 						</div>
 					</div>
 
 					{/* Terminal Exception States */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
 						<div className="p-5 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-2">
-							<div className="text-xs font-bold text-[#C4602A] font-mono uppercase">TERMINAL: rejected</div>
+							<div className="text-xs font-bold text-[#C4602A] font-mono uppercase flex items-center gap-1.5">
+								<span className="w-1.5 h-1.5 rounded-full bg-[#C4602A]"></span>
+								<span>TERMINAL: rejected</span>
+							</div>
 							<p className="text-xs text-[#5C5852] font-normal leading-relaxed">
 								Triggered on guardrail breach (discount &gt; 50%, total &gt; Rs 50k, qty &gt; 10). Session locked and unpayable.
 							</p>
 						</div>
 
 						<div className="p-5 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-2">
-							<div className="text-xs font-bold text-[#5C5852] font-mono uppercase">TERMINAL: cancelled</div>
+							<div className="text-xs font-bold text-[#5C5852] font-mono uppercase flex items-center gap-1.5">
+								<span className="w-1.5 h-1.5 rounded-full bg-[#8C8880]"></span>
+								<span>TERMINAL: cancelled</span>
+							</div>
 							<p className="text-xs text-[#5C5852] font-normal leading-relaxed">
 								Triggered by explicit agent cancellation or 30-min TTL expiry sweep. Soft-held stock returned to available catalog.
 							</p>
 						</div>
 
 						<div className="p-5 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge space-y-2">
-							<div className="text-xs font-bold text-[#141210] font-mono uppercase">TERMINAL: refunded</div>
+							<div className="text-xs font-bold text-[#141210] font-mono uppercase flex items-center gap-1.5">
+								<span className="w-1.5 h-1.5 rounded-full bg-[#0F5E56]"></span>
+								<span>TERMINAL: refunded</span>
+							</div>
 							<p className="text-xs text-[#5C5852] font-normal leading-relaxed">
 								Post-payment reversal calling Razorpay Refund API. Locks session into audited refunded state.
 							</p>
@@ -545,8 +591,11 @@ const session = await client.checkout.createSession({
 				</div>
 			</section>
 
+			{/* Section: Architecture & Protocol Blueprint */}
+			<ArchitectureSection />
+
 			{/* Section: Developer Quickstart */}
-			<section id="quickstart" className="py-24 max-w-5xl mx-auto px-6 space-y-10">
+			<section id="quickstart" className="py-24 max-w-5xl mx-auto px-6 space-y-10 scroll-mt-24 md:scroll-mt-28">
 				<div className="space-y-3">
 					<div className="font-mono text-xs uppercase tracking-wider text-[#0F5E56] font-semibold">
 						Developer Quickstart

@@ -1,9 +1,18 @@
 import type { Metadata } from 'next';
+import { Fraunces } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 
+const fraunces = Fraunces({
+	subsets: ['latin'],
+	variable: '--font-fraunces',
+	display: 'swap',
+});
+
 export const metadata: Metadata = {
-	title: 'Razorpay ACP Checkout Adapter | Autonomous AI Commerce Rail',
-	description: 'Spec-compliant Agentic Commerce Protocol (ACP v2026-04-17) financial safety rail backed by Razorpay. Zero-hallucination catalog pricing, deterministic guardrails, and immutable audit trails.',
+	title: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
+	description: 'ACP-compliant checkout adapter for autonomous AI buyer agents. Server-authoritative catalog pricing, deterministic guardrails, 30-min inventory soft-holds, and immutable audit trails. Payment rail: Razorpay.',
 };
 
 export default function RootLayout({
@@ -12,10 +21,11 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<html lang="en">
-			<body className="bg-[#f8fafc] text-[#0b192c] antialiased selection:bg-blue-500/20 selection:text-blue-700 min-h-screen">
+		<html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${fraunces.variable}`}>
+			<body className="bg-[#FAF9F6] text-[#141210] font-sans antialiased selection:bg-[#0F5E56]/15 selection:text-[#0F5E56] min-h-screen">
 				{children}
 			</body>
 		</html>
 	);
 }
+

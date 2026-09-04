@@ -9,35 +9,36 @@ const config: Config = {
 	theme: {
 		extend: {
 			colors: {
-				razorpay: {
-					blue: '#0c66e4',
-					blueHover: '#0052cc',
-					navy: '#0b192c',
-					dark: '#02042b',
-					cyan: '#00baf2',
-					emerald: '#059669',
-					mint: '#10b981',
-					slate: '#f8fafc',
+				surface: '#FAF9F6',
+				ink: '#141210',
+				'ink-muted': '#5C5852',
+				'border-subtle': '#E8E5DF',
+				accent: {
+					DEFAULT: '#0F5E56',
+					hover: '#09433D',
+					subtle: '#E6F0EE',
+					border: '#C5D8D4',
 				},
-				background: '#ffffff',
-				foreground: '#0b192c',
+				background: '#FAF9F6',
+				foreground: '#141210',
 				card: {
-					DEFAULT: '#ffffff',
-					foreground: '#0b192c',
-					border: '#e2e8f0',
+					DEFAULT: '#FFFFFF',
+					foreground: '#141210',
+					border: '#E8E5DF',
 				},
 				muted: {
-					DEFAULT: '#f1f5f9',
-					foreground: '#64748b',
+					DEFAULT: '#F4F1EC',
+					foreground: '#5C5852',
 				},
 			},
 			fontFamily: {
-				sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-				mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+				serif: ['var(--font-fraunces)', 'Georgia', 'serif'],
+				sans: ['var(--font-geist-sans)', '-apple-system', 'sans-serif'],
+				mono: ['var(--font-geist-mono)', 'SFMono-Regular', 'Consolas', 'monospace'],
 			},
 			boxShadow: {
-				'razorpay': '0 10px 30px -5px rgba(12, 102, 228, 0.08), 0 4px 6px -2px rgba(12, 102, 228, 0.04)',
-				'razorpay-hover': '0 20px 35px -5px rgba(12, 102, 228, 0.15), 0 8px 10px -3px rgba(12, 102, 228, 0.08)',
+				'bridge': '0 1px 3px rgba(20, 18, 16, 0.04), 0 8px 24px -4px rgba(20, 18, 16, 0.04)',
+				'bridge-hover': '0 4px 6px -1px rgba(20, 18, 16, 0.06), 0 16px 32px -4px rgba(20, 18, 16, 0.08)',
 			}
 		},
 	},
@@ -45,3 +46,4 @@ const config: Config = {
 };
 
 export default config;
+

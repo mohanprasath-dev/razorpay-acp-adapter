@@ -1,21 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-	ShieldCheck,
-	CheckCircle2,
-	XCircle,
-	AlertTriangle,
-	RefreshCw,
-	Copy,
-	Check,
-	Terminal,
-	Code,
-	Zap,
-	Lock,
-	ArrowRight,
-	Play,
-} from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 
 interface Scenario {
 	id: string;
@@ -37,8 +23,8 @@ const SCENARIOS: Scenario[] = [
 		id: 'happy-path',
 		title: 'Standard Autonomous Checkout Flow',
 		shortTitle: '1. Happy Path Purchase',
-		badge: 'ACT 2 // FULL COMPLETION',
-		badgeColor: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+		badge: 'STAGE 2 // FULL COMPLETION',
+		badgeColor: 'text-[#0F5E56] bg-[#E6F0EE] border-[#C5D8D4]',
 		description: 'Autonomous buyer agent negotiates 2 items, applies valid promotional discount, attaches tokenized payment method (pm_tok_*), and bridges to Razorpay Orders API.',
 		method: 'POST',
 		endpoint: '/checkout_sessions/cs_e44bcc71/complete',
@@ -94,9 +80,9 @@ const SCENARIOS: Scenario[] = [
 		id: 'price-tamper',
 		title: 'Client-Side Price Tampering Neutralized',
 		shortTitle: '2. Price Tampering Attack',
-		badge: 'ACT 3A // DEFENSE ENGAGED',
-		badgeColor: 'text-rose-700 bg-rose-50 border-rose-200',
-		description: 'Malicious agent attempts to pass unit_price=₹1.00 on a ₹499.00 catalog item. Server completely discards client price and enforces authoritative catalog pricing.',
+		badge: 'STAGE 3A // DEFENSE ENGAGED',
+		badgeColor: 'text-[#C4602A] bg-[#F9ECE5] border-[#E8C2AF]',
+		description: 'Malicious agent attempts to pass unit_price=Rs 1.00 on a Rs 499.00 catalog item. Server completely discards client price and enforces authoritative catalog pricing.',
 		method: 'POST',
 		endpoint: '/checkout_sessions',
 		requestJson: {
@@ -138,9 +124,9 @@ const SCENARIOS: Scenario[] = [
 		id: 'guardrail-breach',
 		title: 'Discount Ceiling Violation Stopped',
 		shortTitle: '3. Guardrail Ceiling Breach',
-		badge: 'ACT 3B // HARD REJECTION',
-		badgeColor: 'text-amber-700 bg-amber-50 border-amber-200',
-		description: 'Agent attempts to apply a ₹375.00 discount on a ₹499 order (75.2% discount > 50% merchant ceiling). Deterministic rule engine triggers HTTP 400 rejection and locks status into "rejected".',
+		badge: 'STAGE 3B // HARD REJECTION',
+		badgeColor: 'text-[#C4602A] bg-[#F9ECE5] border-[#E8C2AF]',
+		description: 'Agent attempts to apply a Rs 375.00 discount on a Rs 499 order (75.2% discount > 50% merchant ceiling). Deterministic rule engine triggers HTTP 400 rejection and locks status into "rejected".',
 		method: 'POST',
 		endpoint: '/checkout_sessions/cs_9fe035df/update',
 		requestJson: {
@@ -152,7 +138,7 @@ const SCENARIOS: Scenario[] = [
 		responseStatus: 400,
 		responseJson: {
 			error: 'guardrail_violation',
-			reason: 'Requested discount (75.2%) exceeds maximum allowed bound of 50% (subtotal: ₹499.00, discount: ₹375.00).',
+			reason: 'Requested discount (75.2%) exceeds maximum allowed bound of 50% (subtotal: Rs 499.00, discount: Rs 375.00).',
 			session_id: 'cs_9fe035df86e34b35',
 			status: 'rejected'
 		},
@@ -163,11 +149,11 @@ const SCENARIOS: Scenario[] = [
 	},
 	{
 		id: 'inventory-expiry',
-		title: 'Soft-Hold Inventory & 30-Min TTL Sweep',
-		shortTitle: '4. TTL Sweeper & Release',
-		badge: 'T17.1 // BACKGROUND MAINTENANCE',
-		badgeColor: 'text-blue-700 bg-blue-50 border-blue-200',
-		description: 'Uncompleted sessions automatically expire after 30 minutes. The background maintenance sweeper cancels expired sessions, releases soft-held inventory, and logs audit events.',
+		title: 'Soft-Hold Inventory and 30-Min TTL Sweep',
+		shortTitle: '4. TTL Sweeper and Release',
+		badge: 'MAINTENANCE // BACKGROUND SWEEP',
+		badgeColor: 'text-[#5C5852] bg-[#F4F1EC] border-[#E8E5DF]',
+		description: 'Uncompleted sessions automatically expire after 30 minutes. The background sweeper cancels expired sessions, releases soft-held inventory, and logs immutable audit events.',
 		method: 'POST',
 		endpoint: '/internal/sweep_expired',
 		requestJson: {
@@ -198,16 +184,16 @@ export default function ProtocolPlayground() {
 	};
 
 	return (
-		<div className="w-full rounded-2xl bg-white border border-slate-200/90 shadow-razorpay overflow-hidden">
+		<div className="w-full rounded-2xl bg-white border border-[#E8E5DF] shadow-bridge overflow-hidden">
 			{/* Top Bar with Scenarios */}
-			<div className="p-6 border-b border-slate-200 bg-slate-50/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+			<div className="p-6 border-b border-[#E8E5DF] bg-[#FAF9F6] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
 				<div className="flex items-center gap-3">
-					<div className="w-8 h-8 rounded-lg bg-[#0c66e4] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+					<div className="w-8 h-8 rounded-lg bg-[#0F5E56] text-white flex items-center justify-center font-mono font-bold text-xs shadow-sm">
 						ACP
 					</div>
 					<div>
-						<h3 className="text-sm font-bold text-[#0b192c]">Live Protocol Interactive Sandbox</h3>
-						<p className="text-xs text-slate-500">Simulate real autonomous buyer interactions against the Razorpay rail</p>
+						<h3 className="text-sm font-bold text-[#141210]">Protocol Sandbox Simulator</h3>
+						<p className="text-xs text-[#5C5852]">Simulate autonomous buyer transactions against the payment rail</p>
 					</div>
 				</div>
 
@@ -219,8 +205,8 @@ export default function ProtocolPlayground() {
 							onClick={() => setActiveScenarioId(s.id)}
 							className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
 								activeScenarioId === s.id
-									? 'bg-[#0c66e4] text-white shadow-md shadow-blue-500/20'
-									: 'bg-white text-slate-600 hover:text-black border border-slate-200 hover:border-slate-300'
+									? 'bg-[#0F5E56] text-white shadow-sm'
+									: 'bg-white text-[#5C5852] hover:text-[#141210] border border-[#E8E5DF] hover:border-[#C5D8D4]'
 							}`}
 						>
 							{s.shortTitle}
@@ -230,51 +216,51 @@ export default function ProtocolPlayground() {
 			</div>
 
 			{/* Scenario Details Bar */}
-			<div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white">
+			<div className="p-6 border-b border-[#E8E5DF] flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white">
 				<div className="space-y-1.5 max-w-2xl">
 					<div className="flex items-center gap-2.5">
 						<span className={`text-[11px] font-mono px-2.5 py-0.5 rounded-full border font-bold ${scenario.badgeColor}`}>
 							{scenario.badge}
 						</span>
-						<span className="font-mono text-xs font-bold text-[#0b192c] bg-slate-100 px-2.5 py-0.5 rounded">
+						<span className="font-mono text-xs font-bold text-[#141210] bg-[#F4F1EC] px-2.5 py-0.5 rounded border border-[#E8E5DF]">
 							{scenario.method} {scenario.endpoint}
 						</span>
 					</div>
-					<h4 className="text-base font-bold text-[#0b192c]">{scenario.title}</h4>
-					<p className="text-xs text-slate-500 leading-relaxed">{scenario.description}</p>
+					<h4 className="text-base font-bold text-[#141210]">{scenario.title}</h4>
+					<p className="text-xs text-[#5C5852] leading-relaxed">{scenario.description}</p>
 				</div>
 
 				{/* Output View Tabs */}
-				<div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs self-start sm:self-center">
+				<div className="flex items-center gap-1.5 bg-[#F4F1EC] p-1 rounded-xl border border-[#E8E5DF] text-xs self-start sm:self-center">
 					<button
 						onClick={() => setActiveView('response')}
 						className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-							activeView === 'response' ? 'bg-white text-[#0c66e4] shadow-sm font-bold' : 'text-slate-600 hover:text-black'
+							activeView === 'response' ? 'bg-white text-[#0F5E56] shadow-sm font-bold' : 'text-[#5C5852] hover:text-[#141210]'
 						}`}
 					>
-						Live Response
+						Response
 					</button>
 					<button
 						onClick={() => setActiveView('request')}
 						className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-							activeView === 'request' ? 'bg-white text-[#0c66e4] shadow-sm font-bold' : 'text-slate-600 hover:text-black'
+							activeView === 'request' ? 'bg-white text-[#0F5E56] shadow-sm font-bold' : 'text-[#5C5852] hover:text-[#141210]'
 						}`}
 					>
-						Request Payload
+						Payload
 					</button>
 					<button
 						onClick={() => setActiveView('curl')}
 						className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-							activeView === 'curl' ? 'bg-white text-[#0c66e4] shadow-sm font-bold' : 'text-slate-600 hover:text-black'
+							activeView === 'curl' ? 'bg-white text-[#0F5E56] shadow-sm font-bold' : 'text-[#5C5852] hover:text-[#141210]'
 						}`}
 					>
-						cURL Command
+						cURL
 					</button>
 				</div>
 			</div>
 
-			{/* Developer Code Window (High-Contrast Navy Developer Surface) */}
-			<div className="p-6 bg-[#0a1224] text-slate-200 font-mono text-xs relative">
+			{/* Developer Code Window */}
+			<div className="p-6 bg-[#121817] text-[#E2DED7] font-mono text-xs relative">
 				{/* Copy Button */}
 				<button
 					onClick={() =>
@@ -284,29 +270,29 @@ export default function ProtocolPlayground() {
 								: JSON.stringify(activeView === 'response' ? scenario.responseJson : scenario.requestJson, null, 2)
 						)
 					}
-					className="absolute top-6 right-6 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs transition-colors shadow-sm"
+					className="absolute top-6 right-6 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E2625] hover:bg-[#283231] text-[#E2DED7] border border-[#2E3A38] text-xs transition-colors shadow-sm"
 					title="Copy content"
 				>
-					{copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+					{copied ? <Check className="w-3.5 h-3.5 text-[#188a7e]" /> : <Copy className="w-3.5 h-3.5" />}
 					<span>{copied ? 'Copied' : 'Copy'}</span>
 				</button>
 
 				{/* Window Header Indicator */}
-				<div className="flex items-center gap-2 pb-4 mb-4 border-b border-slate-800 text-[11px] text-slate-400">
+				<div className="flex items-center gap-2 pb-4 mb-4 border-b border-[#242E2D] text-[11px] text-[#8C8880]">
 					<div className="flex items-center gap-1.5">
-						<span className="w-3 h-3 rounded-full bg-rose-500/80"></span>
-						<span className="w-3 h-3 rounded-full bg-amber-500/80"></span>
-						<span className="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+						<span className="w-2.5 h-2.5 rounded-full bg-[#364240]"></span>
+						<span className="w-2.5 h-2.5 rounded-full bg-[#364240]"></span>
+						<span className="w-2.5 h-2.5 rounded-full bg-[#364240]"></span>
 					</div>
-					<span className="ml-2 font-mono text-slate-400">
-						{activeView === 'response' ? 'HTTP_RESPONSE_VIEWER' : activeView === 'request' ? 'AGENT_PAYLOAD_VIEWER' : 'BASH_CURL_SNIPPET'}
+					<span className="ml-2 font-mono text-[#8C8880]">
+						{activeView === 'response' ? 'HTTP_RESPONSE' : activeView === 'request' ? 'AGENT_PAYLOAD' : 'CURL_COMMAND'}
 					</span>
 					{activeView === 'response' && (
 						<span
 							className={`ml-auto px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
 								scenario.responseStatus === 200 || scenario.responseStatus === 201
-									? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-									: 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+									? 'bg-[#0F5E56]/30 text-[#A3E0D8] border border-[#0F5E56]/50'
+									: 'bg-[#C4602A]/20 text-[#E8C2AF] border border-[#C4602A]/40'
 							}`}
 						>
 							STATUS {scenario.responseStatus} {scenario.responseStatus === 200 ? 'OK' : scenario.responseStatus === 201 ? 'CREATED' : 'BAD REQUEST'}
@@ -317,17 +303,17 @@ export default function ProtocolPlayground() {
 				{/* Code Output */}
 				<div className="overflow-x-auto max-h-[380px]">
 					{activeView === 'response' && (
-						<pre className="text-emerald-300 leading-relaxed">
+						<pre className="text-[#A3E0D8] leading-relaxed">
 							<code>{JSON.stringify(scenario.responseJson, null, 2)}</code>
 						</pre>
 					)}
 					{activeView === 'request' && (
-						<pre className="text-cyan-300 leading-relaxed">
+						<pre className="text-[#E2DED7] leading-relaxed">
 							<code>{JSON.stringify(scenario.requestJson, null, 2)}</code>
 						</pre>
 					)}
 					{activeView === 'curl' && (
-						<pre className="text-blue-300 leading-relaxed whitespace-pre-wrap">
+						<pre className="text-[#E2DED7] leading-relaxed whitespace-pre-wrap">
 							<code>{scenario.curl}</code>
 						</pre>
 					)}
@@ -336,3 +322,4 @@ export default function ProtocolPlayground() {
 		</div>
 	);
 }
+

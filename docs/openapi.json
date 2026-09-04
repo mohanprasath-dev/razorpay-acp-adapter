@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Razorpay ACP Checkout Adapter",
-    "description": "Spec-compliant Agentic Commerce Protocol (ACP) checkout adapter backed by Razorpay",
+    "title": "AgentPay Bridge",
+    "description": "ACP-compliant checkout adapter for autonomous AI buyer agents (Payment rail: Razorpay Orders API)",
     "version": "2026-04-17"
   },
   "paths": {

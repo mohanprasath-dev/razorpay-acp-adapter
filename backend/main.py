@@ -1,4 +1,4 @@
-"""FastAPI Application Entry Point for Razorpay ACP Adapter."""
+"""FastAPI Application Entry Point for AgentPay Bridge."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import get_settings
@@ -7,8 +7,8 @@ from backend.routers import discovery, checkout, auth, internal, webhooks
 settings = get_settings()
 
 app = FastAPI(
-	title='Razorpay ACP Checkout Adapter',
-	description='Spec-compliant Agentic Commerce Protocol (ACP) checkout adapter backed by Razorpay',
+	title='AgentPay Bridge',
+	description='ACP-compliant checkout adapter for autonomous AI buyer agents (Payment rail: Razorpay Orders API)',
 	version=settings.ACP_SPEC_VERSION,
 )
 

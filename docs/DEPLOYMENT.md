@@ -1,10 +1,10 @@
-# Deployment Guide — Razorpay ACP Adapter
+# Deployment Guide — AgentPay Bridge
 
-This document details the production and staging deployment processes for the **Razorpay ACP Adapter** stack:
+This document details the production and staging deployment processes for the **AgentPay Bridge** stack:
 - **Backend**: FastAPI on Google Cloud Run (Containerized)
 - **Frontend**: Next.js 14 on Vercel
 - **Database**: Google Cloud Firestore (Native Mode)
-- **Payment Gateway**: Razorpay (Test / Live Mode)
+- **Payment Rail**: Razorpay (Test / Live Mode Orders API)
 
 ---
 
@@ -21,25 +21,25 @@ The backend is packaged using the root [`Dockerfile`](../Dockerfile) with multi-
 
 ```bash
 # 1. Build and submit container image via Cloud Build
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/razorpay-acp-adapter:latest .
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/agentpay-bridge:latest .
 
 # 2. Deploy to Cloud Run
-gcloud run deploy razorpay-acp-adapter \
-  --image gcr.io/YOUR_PROJECT_ID/razorpay-acp-adapter:latest \
+gcloud run deploy agentpay-bridge \
+  --image gcr.io/YOUR_PROJECT_ID/agentpay-bridge:latest \
   --platform managed \
   --region asia-south1 \
   --allow-unauthenticated \
-  --set-env-vars ENVIRONMENT=production,FIRESTORE_PROJECT_ID=YOUR_PROJECT_ID,RAZORPAY_KEY_ID=rzp_test_xxxx,RAZORPAY_KEY_SECRET=yyyy,ACP_SPEC_VERSION=2026-04-17
+  --set-env-vars ENVIRONMENT=production,FIRESTORE_PROJECT_ID=YOUR_PROJECT_ID,RAZORPAY_KEY_ID=rzp_test_xxxx,RAZORPAY_KEY_SECRET=yyyy,ACP_SPEC_VERSION=2026-04-17,INVENTORY_HOLD_TTL_MINUTES=30
 ```
 
 ### Verification
 ```bash
 # Check health
-curl https://razorpay-acp-adapter-<hash>-el.a.run.app/health
+curl https://agentpay-bridge-<hash>-el.a.run.app/health
 # Response: {"status": "ok"}
 
 # Check capability discovery feed
-curl https://razorpay-acp-adapter-<hash>-el.a.run.app/.well-known/agent.json
+curl https://agentpay-bridge-<hash>-el.a.run.app/.well-known/agent.json
 ```
 
 ---

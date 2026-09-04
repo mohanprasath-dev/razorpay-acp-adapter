@@ -359,7 +359,7 @@ def run_act_4_resilience_and_lifecycle(base_url: str, products: list, pause: flo
 
 
 def main():
-	parser = argparse.ArgumentParser(description='Run Scripted 4-Act Buyer-Agent Simulator for Razorpay ACP Adapter')
+	parser = argparse.ArgumentParser(description='Run Scripted 4-Act Buyer-Agent Simulator for AgentPay Bridge')
 	parser.add_argument('--base-url', default='http://127.0.0.1:8000', help='Target ACP backend base URL')
 	parser.add_argument('--scenario', choices=['happy_path', 'violation', 'all'], default='all', help='Simulation scenario to execute')
 	parser.add_argument('--pause', type=float, default=0.2, help='Pause between steps in seconds for recording clarity')

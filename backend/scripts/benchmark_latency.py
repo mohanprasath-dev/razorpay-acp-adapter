@@ -130,7 +130,7 @@ def run_benchmark() -> List[Dict[str, Any]]:
 def write_markdown_report(results: List[Dict[str, Any]], output_path: str = 'docs/LOAD_TEST_RESULTS.md'):
 	os.makedirs(os.path.dirname(output_path), exist_ok=True)
 	md = []
-	md.append('# TaskDrift Razorpay ACP Adapter — Load Test & Latency Benchmarks')
+	md.append('# AgentPay Bridge — Load Test & Latency Benchmarks\n')
 	md.append('\n> **Specification**: Agentic Commerce Protocol (ACP) v2026-04-17')
 	md.append('> **Benchmark Environment**: Local ASGI Fast In-Memory Engine & ThreadPool Concurrency')
 	md.append('> **Verification**: Zero dropped requests, 100% thread safety, atomic inventory isolation.\n')

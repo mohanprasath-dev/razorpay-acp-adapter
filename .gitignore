@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 secrets/
+docs.local/
 
 # Python
 __pycache__/

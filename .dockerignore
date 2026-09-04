@@ -4,6 +4,7 @@
 .pytest_cache
 frontend/
 docs/
+docs.local/
 *.pyc
 __pycache__
 .DS_Store

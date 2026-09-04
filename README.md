@@ -4,7 +4,7 @@
 > *Enables autonomous AI buyer agents to complete end-to-end purchases with bounded, gated, and auditable money actions.*
 
 [![CI Tests](https://img.shields.io/badge/pytest-41%20passed-emerald.svg)](backend/tests)
-[![ACP Spec](https://img.shields.io/badge/ACP%20Spec-v2026--04--17-blue.svg)](docs/PRD.md)
+[![ACP Spec](https://img.shields.io/badge/ACP%20Spec-v2026--04--17-blue.svg)](docs/architecture.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Framework](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com)
 [![Frontend](https://img.shields.io/badge/Next.js-14%20(App%20Router)-black.svg)](https://nextjs.org)
@@ -67,7 +67,7 @@ flowchart TD
     NextDashboard -->|Fetch Sessions & Logs| CheckoutRouter
 ```
 
-For complete technical specifications, see [`docs/architecture.md`](docs/architecture.md) and [`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md).
+For complete technical specifications, see [`docs/architecture.md`](docs/architecture.md).
 
 ---
 

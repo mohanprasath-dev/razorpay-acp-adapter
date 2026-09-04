@@ -19,19 +19,78 @@ DEFAULT_INITIAL_STOCK: Dict[str, int] = {
 	'prod_bolt_005': 10,
 }
 
-# Thread-safe in-memory stock storage
+# Thread-safe in-memory stock storage & soft-hold session reservations
 _stock_lock = threading.Lock()
 _stock_store: Dict[str, int] = dict(DEFAULT_INITIAL_STOCK)
+_reserved_sessions: Dict[str, Dict[str, int]] = {}
 
 
 def reset_inventory(custom_stock: Optional[Dict[str, int]] = None):
-	"""Resets in-memory stock to default seed values or custom values (useful in tests)."""
-	global _stock_store
+	"""Resets in-memory stock to default seed values or custom values and clears reservations."""
+	global _stock_store, _reserved_sessions
 	with _stock_lock:
 		_stock_store = dict(custom_stock if custom_stock is not None else DEFAULT_INITIAL_STOCK)
+		_reserved_sessions.clear()
 
 
 reset_stock_for_test = reset_inventory
+
+
+def reserve_session_inventory(session_id: str, line_items: List[LineItem]) -> Tuple[bool, Optional[str]]:
+	"""
+	Atomically soft-holds / reserves inventory for an active session.
+	Decrements available stock and records reservation under session_id.
+	Returns (True, None) if reserved, or (False, reason) if insufficient stock.
+	"""
+	with _stock_lock:
+		# Check availability for all items first
+		for item in line_items:
+			current = _stock_store.get(item.product_id, 0)
+			if item.quantity > current:
+				return False, (
+					f'Insufficient stock for product "{item.product_id}": '
+					f'requested {item.quantity} units, but only {current} available.'
+				)
+		# Decrement from stock store into session reservation
+		allocations = _reserved_sessions.get(session_id, {})
+		for item in line_items:
+			_stock_store[item.product_id] -= item.quantity
+			allocations[item.product_id] = allocations.get(item.product_id, 0) + item.quantity
+		_reserved_sessions[session_id] = allocations
+		return True, None
+
+
+def release_session_inventory(session_id: str) -> bool:
+	"""
+	Releases soft-held inventory back to available stock upon session cancellation or expiry.
+	Returns True if inventory was held and released, False otherwise.
+	"""
+	with _stock_lock:
+		if session_id in _reserved_sessions:
+			allocations = _reserved_sessions.pop(session_id)
+			for prod_id, qty in allocations.items():
+				_stock_store[prod_id] = _stock_store.get(prod_id, 0) + qty
+			return True
+		return False
+
+
+def commit_session_inventory(session_id: str) -> bool:
+	"""
+	Finalizes reserved inventory on session completion so it is not returned.
+	Returns True if reservation was present and committed.
+	"""
+	with _stock_lock:
+		if session_id in _reserved_sessions:
+			_reserved_sessions.pop(session_id)
+			return True
+		return False
+
+
+def has_reserved_inventory(session_id: str) -> bool:
+	"""Checks whether an active session holds soft-reserved stock."""
+	with _stock_lock:
+		return session_id in _reserved_sessions
+
 
 
 def get_stock(product_id: str) -> int:

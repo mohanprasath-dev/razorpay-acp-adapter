@@ -66,12 +66,23 @@ All models are defined in [`backend/models.py`](../backend/models.py) using stri
     "discount": 0.0,
     "tax": 179.64,
     "total": 1177.64,
-    "currency": "INR"
+    "currency": "INR",
+    "tax_breakdown": [
+      {
+        "rate": 0.18,
+        "tax_rate": 0.18,
+        "subtotal": 998.0,
+        "tax": 179.64,
+        "tax_amount": 179.64
+      }
+    ]
   },
   "payment_provider": {
     "provider": "razorpay",
-    "razorpay_order_id": "order_RvXyJcK183921"
+    "razorpay_order_id": "order_RvXyJcK183921",
+    "refund_id": null
   },
+  "expires_at": "2026-09-02T12:15:00Z",
   "created_at": "2026-09-02T11:45:00Z",
   "updated_at": "2026-09-02T11:45:05Z"
 }
@@ -83,7 +94,7 @@ All models are defined in [`backend/models.py`](../backend/models.py) using stri
   "id": "audit_80a37e891b22",
   "session_id": "cs_699564c73499",
   "action": "reject", # create | update | complete | reject | cancel
-  "actor": "buyer_agent_sim",
+  "actor": "agent_80a37e891b22", # Authenticated cryptographic agent_id (from X-API-Key)
   "reason": "Max order value exceeded: ₹73,738.20 > ₹50,000.00",
   "before_total": 1177.64,
   "after_total": 73738.20,

@@ -68,6 +68,10 @@ def log_error(message: str):
 	print(f'{BOLD}{RED}[ERROR]:{RESET} {message}')
 
 
+_agent_api_key: Optional[str] = None
+_agent_id: Optional[str] = None
+
+
 def http_request(
 	url: str,
 	method: str = 'GET',
@@ -75,6 +79,8 @@ def http_request(
 	headers: Optional[Dict[str, str]] = None
 ) -> Dict[str, Any]:
 	req_headers = {'Content-Type': 'application/json', 'User-Agent': 'TaskDrift-BuyerAgentSim/1.0'}
+	if _agent_api_key and (headers is None or 'X-API-Key' not in headers):
+		req_headers['X-API-Key'] = _agent_api_key
 	if headers:
 		req_headers.update(headers)
 
@@ -99,8 +105,27 @@ def http_request(
 		sys.exit(1)
 
 
+def register_sim_agent(base_url: str, pause: float) -> str:
+	"""Registers autonomous buyer agent to acquire valid X-API-Key per ACP Round 3 auth spec."""
+	global _agent_api_key, _agent_id
+	log_step('1.0', 'Autonomous Agent Registration', 'Registering agent identity to acquire cryptographic X-API-Key')
+	reg_res = http_request(f'{base_url}/agents/register', method='POST', data={'name': 'Aura Autonomous Buyer Agent #42'})
+	if reg_res['status_code'] != 201:
+		log_error(f'Agent registration failed: {reg_res["data"]}')
+		sys.exit(1)
+	_agent_api_key = reg_res['data']['api_key']
+	_agent_id = reg_res['data']['agent_id']
+	log_payload('Registered Agent Identity & API Key', reg_res['data'])
+	log_success(f'Cryptographic Identity Established: {_agent_id} | Key: {_agent_api_key[:16]}...')
+	time.sleep(pause)
+	return _agent_id
+
+
 def run_act_1_discovery(base_url: str, pause: float):
 	log_act(1, 'Protocol Discovery & Capability Resolution')
+
+	# Step 1.0: Register agent identity
+	register_sim_agent(base_url=base_url, pause=pause)
 
 	# Step 1.1: Discovery
 	log_step('1.1', 'Fetch Agent Capability Document', 'Querying unauthenticated well-known capability manifest')

@@ -31,6 +31,7 @@ class LineItem(BaseModel):
 	product_id: str
 	quantity: int = Field(gt=0, description='Quantity must be greater than zero')
 	unit_price: float = Field(ge=0.0, description='Unit price must be non-negative')
+	tax_rate: Optional[float] = Field(default=0.18, ge=0.0, le=1.0, description='GST tax rate as decimal (e.g. 0.18)')
 
 
 class Product(BaseModel):
@@ -40,6 +41,8 @@ class Product(BaseModel):
 	currency: str = Field(default='INR', min_length=3, max_length=3)
 	description: str
 	stock: int = Field(default=100, ge=0, description='Available inventory stock quantity')
+	tax_rate: float = Field(default=0.18, ge=0.0, le=1.0, description='GST tax rate as decimal (e.g. 0.18)')
+	category: Optional[str] = Field(default='general', description='Product category for search/filtering')
 
 
 class Buyer(BaseModel):
@@ -57,12 +60,29 @@ class Address(BaseModel):
 	country: str
 
 
+class TaxBreakdownItem(BaseModel):
+	rate: float = Field(default=0.18, description='Tax rate as decimal (e.g. 0.18 for 18% GST)')
+	tax_rate: Optional[float] = None
+	subtotal: float = Field(ge=0.0, description='Taxable subtotal allocated to this rate')
+	tax: float = Field(ge=0.0, description='Tax amount for this rate')
+	tax_amount: Optional[float] = None
+
+	@model_validator(mode='after')
+	def sync_aliases(self) -> 'TaxBreakdownItem':
+		if self.tax_rate is None:
+			self.tax_rate = self.rate
+		if self.tax_amount is None:
+			self.tax_amount = self.tax
+		return self
+
+
 class Totals(BaseModel):
 	subtotal: float = Field(ge=0.0, description='Subtotal must be non-negative')
 	discount: float = Field(default=0.0, ge=0.0, description='Discount must be non-negative')
 	tax: float = Field(default=0.0, ge=0.0, description='Tax must be non-negative')
 	total: float = Field(ge=0.0, description='Total must be non-negative')
 	currency: str = Field(min_length=3, max_length=3, description='ISO 4217 3-letter currency code')
+	tax_breakdown: List[TaxBreakdownItem] = Field(default_factory=list, description='Granular per-tax-rate breakdown')
 
 	@field_validator('currency')
 	@classmethod
@@ -90,6 +110,7 @@ class CheckoutSession(BaseModel):
 	payment_method_token: Optional[str] = None
 	is_anomalous: bool = False
 	anomaly_score: Optional[int] = 0
+	expires_at: Optional[datetime] = None
 	created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 	updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

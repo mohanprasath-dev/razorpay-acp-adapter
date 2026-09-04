@@ -35,6 +35,9 @@ class Settings(BaseSettings):
 	# Rate Limiting (In-memory sliding window for single-instance adapter)
 	RATE_LIMIT_PER_MINUTE: int = 120
 
+	# Session TTL / Expiry (in minutes)
+	SESSION_TTL_MINUTES: int = 30
+
 
 @lru_cache()
 def get_settings() -> Settings:

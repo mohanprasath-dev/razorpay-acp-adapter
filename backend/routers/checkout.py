@@ -3,10 +3,11 @@ Handles creation, updating, retrieval, completion, cancellation, guardrail bound
 """
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict
 from fastapi import APIRouter, Header, HTTPException, status, Depends
 from pydantic import BaseModel, Field
+from backend.config import get_settings
 from backend.models import (
 	Address,
 	AuditAction,
@@ -28,6 +29,9 @@ from backend.services.inventory import (
 	validate_inventory_availability,
 	decrement_inventory_atomic,
 	get_stock,
+	release_session_inventory,
+	commit_session_inventory,
+	has_reserved_inventory,
 )
 from backend.services.tokenization import generate_payment_token, validate_payment_token
 from backend.services.anomaly import (
@@ -36,10 +40,12 @@ from backend.services.anomaly import (
 	record_spend,
 	evaluate_anomaly_score,
 )
+from backend.services.auth import get_authenticated_agent_id
 
 import threading
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter(prefix='/checkout_sessions', tags=['Checkout Sessions'])
 
@@ -181,15 +187,19 @@ async def list_checkout_sessions():
 )
 async def create_checkout_session(
 	request: CreateCheckoutSessionRequest,
-	idempotency_key: Optional[str] = Header(default=None, alias='Idempotency-Key')
+	idempotency_key: Optional[str] = Header(default=None, alias='Idempotency-Key'),
+	agent_id: str = Depends(get_authenticated_agent_id)
 ):
 	"""
 	Creates a new ACP Checkout Session:
-	1. Enforces idempotency via Idempotency-Key header.
-	2. Computes authoritative pricing from server catalog.
-	3. Validates inventory availability and deterministic guardrail rules.
-	4. Persists session and writes immutable AuditEntry for all checks (pass or reject).
-	5. Dispatches signed HMAC webhook event.
+	1. Enforces X-API-Key agent authentication.
+	2. Enforces idempotency via Idempotency-Key header.
+	3. Computes authoritative pricing from server catalog.
+	4. Sets session TTL (expires_at) based on SESSION_TTL_MINUTES.
+	5. Validates inventory availability and deterministic guardrail rules.
+	6. Evaluates anomaly score keyed to authenticated agent_id.
+	7. Persists session and writes immutable AuditEntry with agent_id actor.
+	8. Dispatches signed HMAC webhook event.
 	"""
 	with _idempotency_lock:
 		# Check Idempotency Key
@@ -214,6 +224,7 @@ async def create_checkout_session(
 
 		session_id = f'cs_{uuid.uuid4().hex[:16]}'
 		now = datetime.now(timezone.utc)
+		expires_at = now + timedelta(minutes=settings.SESSION_TTL_MINUTES)
 
 		# Evaluate Guardrails
 		passed, reject_reason = validate_guardrails(
@@ -231,13 +242,12 @@ async def create_checkout_session(
 				reject_reason = stock_reason
 				is_guardrail_err = False
 
-		# Record and evaluate anomaly score
-		identifier = (request.buyer.email if request.buyer and request.buyer.email else f'anon_{session_id}').strip().lower()
-		record_session_creation(identifier)
+		# Record and evaluate anomaly score keyed strictly to authenticated agent_id
+		record_session_creation(agent_id)
 		if not passed and is_guardrail_err:
-			record_guardrail_violation(identifier)
+			record_guardrail_violation(agent_id)
 
-		anomaly_score, anomaly_flags, should_block = evaluate_anomaly_score(identifier, current_order_amount=totals.total)
+		anomaly_score, anomaly_flags, should_block = evaluate_anomaly_score(agent_id, current_order_amount=totals.total)
 
 		if should_block:
 			action_type = AuditAction.FLAGGED_ANOMALOUS
@@ -245,7 +255,7 @@ async def create_checkout_session(
 			record_audit_entry(
 				session_id=session_id,
 				action=action_type,
-				actor='buyer_agent_sim',
+				actor=agent_id,
 				reason=reason_str,
 				before_total=None,
 				after_total=totals.total
@@ -275,6 +285,7 @@ async def create_checkout_session(
 			payment_method_token=None,
 			is_anomalous=is_flagged_anomalous,
 			anomaly_score=anomaly_score,
+			expires_at=expires_at,
 			created_at=now,
 			updated_at=now
 		)
@@ -291,7 +302,7 @@ async def create_checkout_session(
 			record_audit_entry(
 				session_id=session_id,
 				action=AuditAction.FLAGGED_ANOMALOUS,
-				actor='buyer_agent_sim',
+				actor=agent_id,
 				reason=f'Elevated anomaly score ({anomaly_score}/100): {", ".join(anomaly_flags)}',
 				before_total=None,
 				after_total=totals.total
@@ -301,7 +312,7 @@ async def create_checkout_session(
 			record_audit_entry(
 				session_id=session_id,
 				action=AuditAction.CREATE,
-				actor='buyer_agent_sim',
+				actor=agent_id,
 				reason=None,
 				before_total=None,
 				after_total=totals.total
@@ -313,7 +324,7 @@ async def create_checkout_session(
 			record_audit_entry(
 				session_id=session_id,
 				action=action_type,
-				actor='buyer_agent_sim',
+				actor=agent_id,
 				reason=reject_reason,
 				before_total=None,
 				after_total=totals.total
@@ -400,9 +411,15 @@ def is_ready_for_payment(
 	dependencies=[Depends(rate_limit_dependency)],
 	summary='Update Checkout Session'
 )
-async def update_checkout_session(session_id: str, request: UpdateCheckoutSessionRequest):
+async def update_checkout_session(
+	session_id: str,
+	request: UpdateCheckoutSessionRequest,
+	agent_id: str = Depends(get_authenticated_agent_id)
+):
 	"""
 	Updates an existing checkout session with multi-turn cart negotiation support:
+	- Requires authenticated agent API key.
+	- Validates session TTL / expiry.
 	- Supports partial line item patches: add item, change quantity, or remove item (quantity=0).
 	- Supports applying, changing, or removing discounts (recalculating authoritative totals).
 	- Re-validates inventory availability and guardrails on every turn.
@@ -413,6 +430,30 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 		raise HTTPException(
 			status_code=status.HTTP_404_NOT_FOUND,
 			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	now = datetime.now(timezone.utc)
+	if session.expires_at and now > session.expires_at:
+		session.status = SessionStatus.CANCELLED
+		session.updated_at = now
+		save_session(session)
+		release_session_inventory(session.id)
+		record_audit_entry(
+			session_id=session_id,
+			action=AuditAction.CANCEL,
+			actor=agent_id,
+			reason='expired',
+			before_total=session.totals.total,
+			after_total=session.totals.total
+		)
+		raise HTTPException(
+			status_code=status.HTTP_409_CONFLICT,
+			detail={
+				'error': 'expired_session',
+				'reason': f'Checkout session "{session_id}" has expired at {session.expires_at.isoformat()}. Cannot update.',
+				'session_id': session_id,
+				'status': 'cancelled'
+			}
 		)
 
 	if session.status in [SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.REFUNDED]:
@@ -474,11 +515,13 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 			reject_reason = stock_reason
 			is_guardrail_err = False
 
-	now = datetime.now(timezone.utc)
 	new_buyer = request.buyer if request.buyer is not None else session.buyer
 	new_address = request.fulfillment_address if request.fulfillment_address is not None else session.fulfillment_address
 
 	if not passed:
+		if is_guardrail_err:
+			record_guardrail_violation(agent_id)
+
 		session.status = SessionStatus.REJECTED
 		session.updated_at = now
 		save_session(session)
@@ -487,7 +530,7 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 		record_audit_entry(
 			session_id=session_id,
 			action=action_type,
-			actor='buyer_agent_sim',
+			actor=agent_id,
 			reason=reject_reason,
 			before_total=before_total,
 			after_total=totals.total
@@ -518,7 +561,7 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.UPDATE,
-		actor='buyer_agent_sim',
+		actor=agent_id,
 		before_total=before_total,
 		after_total=totals.total
 	)
@@ -532,7 +575,11 @@ async def update_checkout_session(session_id: str, request: UpdateCheckoutSessio
 	dependencies=[Depends(rate_limit_dependency)],
 	summary='Attach Delegated Payment Method Token'
 )
-async def attach_payment_method(session_id: str, request: Optional[AttachPaymentMethodRequest] = None):
+async def attach_payment_method(
+	session_id: str,
+	request: Optional[AttachPaymentMethodRequest] = None,
+	agent_id: str = Depends(get_authenticated_agent_id)
+):
 	"""
 	Attaches a delegated payment method token to the checkout session per ACP spec.
 	Validates token format (pm_tok_...) or generates a stub token if not provided.
@@ -543,6 +590,30 @@ async def attach_payment_method(session_id: str, request: Optional[AttachPayment
 		raise HTTPException(
 			status_code=status.HTTP_404_NOT_FOUND,
 			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	now = datetime.now(timezone.utc)
+	if session.expires_at and now > session.expires_at:
+		session.status = SessionStatus.CANCELLED
+		session.updated_at = now
+		save_session(session)
+		release_session_inventory(session.id)
+		record_audit_entry(
+			session_id=session_id,
+			action=AuditAction.CANCEL,
+			actor=agent_id,
+			reason='expired',
+			before_total=session.totals.total,
+			after_total=session.totals.total
+		)
+		raise HTTPException(
+			status_code=status.HTTP_409_CONFLICT,
+			detail={
+				'error': 'expired_session',
+				'reason': f'Checkout session "{session_id}" has expired at {session.expires_at.isoformat()}. Cannot attach payment method.',
+				'session_id': session_id,
+				'status': 'cancelled'
+			}
 		)
 
 	if session.status in [SessionStatus.COMPLETED, SessionStatus.CANCELLED, SessionStatus.REFUNDED]:
@@ -559,7 +630,6 @@ async def attach_payment_method(session_id: str, request: Optional[AttachPayment
 		)
 
 	session.payment_method_token = token
-	now = datetime.now(timezone.utc)
 	session.updated_at = now
 
 	if is_ready_for_payment(session.buyer, session.fulfillment_address, session.line_items, session.payment_method_token):
@@ -570,7 +640,7 @@ async def attach_payment_method(session_id: str, request: Optional[AttachPayment
 	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.ATTACH_PAYMENT_METHOD,
-		actor='buyer_agent_sim',
+		actor=agent_id,
 		reason=f'Attached delegated payment token {token[:16]}...',
 		before_total=session.totals.total,
 		after_total=session.totals.total
@@ -585,11 +655,14 @@ async def attach_payment_method(session_id: str, request: Optional[AttachPayment
 	dependencies=[Depends(rate_limit_dependency)],
 	summary='Complete Checkout Session'
 )
-async def complete_checkout_session(session_id: str):
+async def complete_checkout_session(
+	session_id: str,
+	agent_id: str = Depends(get_authenticated_agent_id)
+):
 	"""
 	Finalizes the checkout session:
-	1. Validates active status and attached payment method token.
-	2. Atomically decrements catalog inventory.
+	1. Validates active status, expiry, and attached payment method token.
+	2. Atomically decrements or commits catalog inventory.
 	3. Creates Razorpay Order scoped to total.
 	4. Transitions session to 'completed'.
 	5. Logs AuditEntry and dispatches signed HMAC webhook event.
@@ -599,6 +672,30 @@ async def complete_checkout_session(session_id: str):
 		raise HTTPException(
 			status_code=status.HTTP_404_NOT_FOUND,
 			detail=f'Checkout session with id "{session_id}" was not found.'
+		)
+
+	now = datetime.now(timezone.utc)
+	if session.expires_at and now > session.expires_at:
+		session.status = SessionStatus.CANCELLED
+		session.updated_at = now
+		save_session(session)
+		release_session_inventory(session.id)
+		record_audit_entry(
+			session_id=session_id,
+			action=AuditAction.CANCEL,
+			actor=agent_id,
+			reason='expired',
+			before_total=session.totals.total,
+			after_total=session.totals.total
+		)
+		raise HTTPException(
+			status_code=status.HTTP_409_CONFLICT,
+			detail={
+				'error': 'expired_session',
+				'reason': f'Checkout session "{session_id}" has expired at {session.expires_at.isoformat()}. Cannot complete.',
+				'session_id': session_id,
+				'status': 'cancelled'
+			}
 		)
 
 	if session.status == SessionStatus.COMPLETED:
@@ -626,31 +723,34 @@ async def complete_checkout_session(session_id: str):
 			'without explicit ready_for_payment transition.'
 		)
 
-	# Atomically decrement inventory
-	decremented, decr_reason = decrement_inventory_atomic(session.line_items)
-	if not decremented:
-		session.status = SessionStatus.REJECTED
-		session.updated_at = datetime.now(timezone.utc)
-		save_session(session)
+	# Atomically commit soft-held inventory or decrement inventory
+	if has_reserved_inventory(session.id):
+		commit_session_inventory(session.id)
+	else:
+		decremented, decr_reason = decrement_inventory_atomic(session.line_items)
+		if not decremented:
+			session.status = SessionStatus.REJECTED
+			session.updated_at = now
+			save_session(session)
 
-		record_audit_entry(
-			session_id=session_id,
-			action=AuditAction.OUT_OF_STOCK,
-			actor='buyer_agent_sim',
-			reason=decr_reason,
-			before_total=session.totals.total,
-			after_total=session.totals.total
-		)
+			record_audit_entry(
+				session_id=session_id,
+				action=AuditAction.OUT_OF_STOCK,
+				actor=agent_id,
+				reason=decr_reason,
+				before_total=session.totals.total,
+				after_total=session.totals.total
+			)
 
-		raise HTTPException(
-			status_code=status.HTTP_400_BAD_REQUEST,
-			detail={
-				'error': 'out_of_stock',
-				'reason': decr_reason,
-				'session_id': session_id,
-				'status': 'rejected'
-			}
-		)
+			raise HTTPException(
+				status_code=status.HTTP_400_BAD_REQUEST,
+				detail={
+					'error': 'out_of_stock',
+					'reason': decr_reason,
+					'session_id': session_id,
+					'status': 'rejected'
+				}
+			)
 
 	# Create real Razorpay test-mode Order scoped to total
 	try:
@@ -666,17 +766,19 @@ async def complete_checkout_session(session_id: str):
 			detail=f'Failed to create payment rail order with Razorpay: {str(exc)}'
 		)
 
-	now = datetime.now(timezone.utc)
 	session.payment_provider.razorpay_order_id = rzp_order['id']
 	session.status = SessionStatus.COMPLETED
 	session.updated_at = now
+
+	# Record spend for authenticated agent
+	record_spend(agent_id, session.totals.total)
 
 	save_session(session)
 
 	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.COMPLETE,
-		actor='buyer_agent_sim',
+		actor=agent_id,
 		before_total=session.totals.total,
 		after_total=session.totals.total
 	)
@@ -699,10 +801,13 @@ async def complete_checkout_session(session_id: str):
 	dependencies=[Depends(rate_limit_dependency)],
 	summary='Cancel Checkout Session'
 )
-async def cancel_checkout_session(session_id: str):
+async def cancel_checkout_session(
+	session_id: str,
+	agent_id: str = Depends(get_authenticated_agent_id)
+):
 	"""
 	Cancels an incomplete checkout session.
-	Transitions status to 'cancelled', records AuditEntry, and dispatches signed webhook.
+	Transitions status to 'cancelled', releases any reserved inventory, records AuditEntry, and dispatches signed webhook.
 	"""
 	session = get_session_by_id(session_id)
 	if not session:
@@ -733,12 +838,15 @@ async def cancel_checkout_session(session_id: str):
 	session.status = SessionStatus.CANCELLED
 	session.updated_at = now
 
+	# Release any soft-held inventory back to stock
+	release_session_inventory(session.id)
+
 	save_session(session)
 
 	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.CANCEL,
-		actor='buyer_agent_sim',
+		actor=agent_id,
 		before_total=session.totals.total,
 		after_total=session.totals.total
 	)
@@ -757,12 +865,16 @@ async def cancel_checkout_session(session_id: str):
 	dependencies=[Depends(rate_limit_dependency)],
 	summary='Refund Completed Checkout Session'
 )
-async def refund_checkout_session(session_id: str, request: Optional[RefundCheckoutSessionRequest] = None):
+async def refund_checkout_session(
+	session_id: str,
+	request: Optional[RefundCheckoutSessionRequest] = None,
+	agent_id: str = Depends(get_authenticated_agent_id)
+):
 	"""
 	Executes a post-completion cancellation/refund on a finalized ACP session:
 	1. Validates session is in 'completed' state with an active Razorpay Order.
 	2. Bridges to Razorpay Refund API (client.payment.refund / create_refund).
-	3. Transitions session to 'refunded' and records AuditAction.REFUND.
+	3. Transitions session to 'refunded' and records AuditAction.REFUND with authenticated agent_id.
 	4. Dispatches HMAC-signed 'checkout_session.refunded' webhook event.
 	"""
 	session = get_session_by_id(session_id)
@@ -818,7 +930,7 @@ async def refund_checkout_session(session_id: str, request: Optional[RefundCheck
 	record_audit_entry(
 		session_id=session_id,
 		action=AuditAction.REFUND,
-		actor='buyer_agent_sim',
+		actor=agent_id,
 		reason=refund_reason,
 		before_total=session.totals.total,
 		after_total=0.0

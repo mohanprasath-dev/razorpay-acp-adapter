@@ -5,7 +5,9 @@
     "price": 499.0,
     "currency": "INR",
     "description": "High-throughput inference credit package for AI agent execution workflows.",
-    "stock": 100
+    "stock": 100,
+    "tax_rate": 0.18,
+    "category": "general"
   },
   {
     "id": "prod_bolt_002",
@@ -13,7 +15,9 @@
     "price": 4999.0,
     "currency": "INR",
     "description": "Comprehensive Lighthouse, SEO, and Three.js performance tuning package.",
-    "stock": 2
+    "stock": 2,
+    "tax_rate": 0.18,
+    "category": "general"
   },
   {
     "id": "prod_bolt_003",
@@ -21,7 +25,9 @@
     "price": 9999.0,
     "currency": "INR",
     "description": "Production-ready custom procedural shaders, bloom filters, and particle system bundle.",
-    "stock": 15
+    "stock": 15,
+    "tax_rate": 0.18,
+    "category": "general"
   },
   {
     "id": "prod_bolt_004",
@@ -29,7 +35,9 @@
     "price": 2499.0,
     "currency": "INR",
     "description": "Enterprise payment rail bridge with backoff retry and idempotent order handlers.",
-    "stock": 30
+    "stock": 30,
+    "tax_rate": 0.18,
+    "category": "general"
   },
   {
     "id": "prod_bolt_005",
@@ -37,6 +45,8 @@
     "price": 14999.0,
     "currency": "INR",
     "description": "Full commercial deployment license for ACP-compliant bounded checkout adapter.",
-    "stock": 10
+    "stock": 10,
+    "tax_rate": 0.18,
+    "category": "general"
   }
 ]

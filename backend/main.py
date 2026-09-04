@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import get_settings
-from backend.routers import discovery, checkout
+from backend.routers import discovery, checkout, auth, internal, webhooks
 
 settings = get_settings()
 
@@ -30,6 +30,9 @@ app.add_middleware(
 # Include Routers
 app.include_router(discovery.router)
 app.include_router(checkout.router)
+app.include_router(auth.router)
+app.include_router(internal.router)
+app.include_router(webhooks.router)
 
 
 from typing import List

@@ -11,8 +11,47 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-	title: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
-	description: 'ACP-compliant checkout adapter for autonomous AI buyer agents. Server-authoritative catalog pricing, deterministic guardrails, 30-min inventory soft-holds, and immutable audit trails. Payment rail: Razorpay.',
+	metadataBase: new URL('https://agentpay-bridge.taskdrift.com'),
+	title: {
+		default: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
+		template: '%s | AgentPay Bridge',
+	},
+	description:
+		'ACP-compliant checkout adapter for autonomous AI buyer agents. Server-authoritative catalog pricing, deterministic guardrails, 30-min inventory soft-holds, and immutable audit trails. Payment rail: Razorpay.',
+	keywords: [
+		'Agentic Commerce Protocol',
+		'ACP',
+		'Razorpay',
+		'AI Buyer Agents',
+		'Autonomous Checkout',
+		'E-Commerce FinTech',
+		'Deterministic Guardrails',
+	],
+	authors: [{ name: 'Mohan Prasath', url: 'https://github.com/mohanprasath-dev' }],
+	creator: 'Mohan Prasath (TaskDrift)',
+	openGraph: {
+		title: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
+		description:
+			'ACP-compliant checkout adapter for autonomous AI buyer agents. Server-authoritative catalog pricing, deterministic guardrails, 30-min inventory soft-holds, and immutable audit trails. Payment rail: Razorpay.',
+		url: 'https://agentpay-bridge.taskdrift.com',
+		siteName: 'AgentPay Bridge',
+		locale: 'en_US',
+		type: 'website',
+	},
+	twitter: {
+		card: 'summary_large_image',
+		title: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
+		description:
+			'ACP-compliant checkout adapter for autonomous AI buyer agents. Payment rail: Razorpay.',
+		creator: '@taskdrift',
+	},
+	icons: {
+		icon: [
+			{ url: '/icon.svg', type: 'image/svg+xml' },
+		],
+		shortcut: '/icon.svg',
+		apple: '/icon.svg',
+	},
 };
 
 export default function RootLayout({

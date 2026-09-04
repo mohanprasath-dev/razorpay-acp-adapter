@@ -1,25 +1,71 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+
+interface NodeInfo {
+	id: string;
+	title: string;
+	role: string;
+	color: number;
+	pos: [number, number, number];
+	status: string;
+}
+
+const NODES_METADATA: NodeInfo[] = [
+	{
+		id: 'buyer-agent',
+		title: 'Aura Agent',
+		role: 'Autonomous Buyer Intent',
+		color: 0x0f5e56, // Deep Teal
+		pos: [2.6, 1.1, 0.4],
+		status: 'DISPATCHING',
+	},
+	{
+		id: 'guardrail',
+		title: 'Guardrail Mutex',
+		role: 'Deterministic Rule Engine',
+		color: 0xc4602a, // Rich Amber
+		pos: [-2.5, -0.9, 0.6],
+		status: 'ENFORCING',
+	},
+	{
+		id: 'inventory',
+		title: 'Stock Lock',
+		role: '30-Min TTL Soft-Hold',
+		color: 0x3d7068, // Mineral Teal
+		pos: [1.8, -1.8, -0.8],
+		status: 'RESERVED',
+	},
+	{
+		id: 'razorpay-rail',
+		title: 'Settlement Rail',
+		role: 'Razorpay Orders API',
+		color: 0x0f5e56, // Deep Teal
+		pos: [-2.0, 1.8, -0.6],
+		status: 'SYNCHRONIZED',
+	},
+];
 
 export default function AgentNeuralCanvas() {
 	const containerRef = useRef<HTMLDivElement>(null);
+	const [activeNode, setActiveNode] = useState<NodeInfo | null>(null);
 
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
 
-		// Respect user prefers-reduced-motion
 		const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+		// Scene Setup
 		const scene = new THREE.Scene();
 
-		const width = container.clientWidth || 800;
-		const height = container.clientHeight || 500;
+		const width = container.clientWidth || 500;
+		const height = container.clientHeight || 440;
 
-		const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-		camera.position.set(0, 1.2, 17);
+		// Close camera for high physical presence and tangible scale
+		const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+		camera.position.set(0, 0.3, 7.4);
 
 		const renderer = new THREE.WebGLRenderer({
 			antialias: true,
@@ -28,103 +74,133 @@ export default function AgentNeuralCanvas() {
 		});
 		renderer.setSize(width, height);
 		renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+		renderer.toneMapping = THREE.ACESFilmicToneMapping;
+		renderer.toneMappingExposure = 1.15;
 		container.appendChild(renderer.domElement);
 
-		// Disposables registry for complete cleanup on unmount
 		const disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[] = [];
 
-		// Lighting for physical faceted depth
-		const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+		// Studio Lighting for High-Contrast Sculptural Planes
+		const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
 		scene.add(ambientLight);
 
-		const dirLight1 = new THREE.DirectionalLight(0xffffff, 2.8);
-		dirLight1.position.set(12, 18, 14);
-		scene.add(dirLight1);
+		// Key Light: Sharp top-right crisp illumination
+		const keyLight = new THREE.DirectionalLight(0xfffdfa, 3.4);
+		keyLight.position.set(8, 12, 10);
+		scene.add(keyLight);
 
-		const dirLight2 = new THREE.DirectionalLight(0xe6f0ee, 1.2);
-		dirLight2.position.set(-14, -8, -10);
-		scene.add(dirLight2);
+		// Rim / Counter Light: Warm amber specular bevels
+		const rimLight = new THREE.DirectionalLight(0xf59e0b, 2.6);
+		rimLight.position.set(-10, -6, -8);
+		scene.add(rimLight);
 
-		const corePointLight = new THREE.PointLight(0x0f5e56, 3.5, 12);
-		corePointLight.position.set(0, 0, 0);
-		scene.add(corePointLight);
+		// Soft Teal Fill Light
+		const fillLight = new THREE.DirectionalLight(0x0f5e56, 1.4);
+		fillLight.position.set(0, -8, 6);
+		scene.add(fillLight);
 
-		// Main system group for cursor parallax
-		const systemGroup = new THREE.Group();
-		scene.add(systemGroup);
+		// Central Omnidirectional Point Glow
+		const coreLight = new THREE.PointLight(0x0f5e56, 2.8, 8);
+		coreLight.position.set(0, 0, 0);
+		scene.add(coreLight);
 
-		// 1. Central Faceted Crystal Icosahedron (AgentPay Core)
-		const coreGeom = new THREE.IcosahedronGeometry(1.7, 0); // Bold 20 facets
-		const coreMat = new THREE.MeshStandardMaterial({
+		// Root Transformation Group for Parallax
+		const masterGroup = new THREE.Group();
+		scene.add(masterGroup);
+
+		// -------------------------------------------------------------
+		// 1. Central Kinetic Core: Substantial Faceted Polyhedron
+		// -------------------------------------------------------------
+		const coreGroup = new THREE.Group();
+		masterGroup.add(coreGroup);
+
+		// Outer Sculptural Shell: Substantial Dodecahedron with Crisp Flat Shading
+		const outerCoreGeom = new THREE.DodecahedronGeometry(1.65, 0);
+		const outerCoreMat = new THREE.MeshStandardMaterial({
 			color: 0x0f5e56, // Deep Teal
-			roughness: 0.25,
-			metalness: 0.15,
+			roughness: 0.18,
+			metalness: 0.28,
 			flatShading: true,
-			transparent: true,
-			opacity: 0.92,
+			polygonOffset: true,
+			polygonOffsetFactor: 1,
+			polygonOffsetUnits: 1,
 		});
-		disposables.push(coreGeom, coreMat);
-		const coreMesh = new THREE.Mesh(coreGeom, coreMat);
-		systemGroup.add(coreMesh);
+		disposables.push(outerCoreGeom, outerCoreMat);
+		const outerCoreMesh = new THREE.Mesh(outerCoreGeom, outerCoreMat);
+		coreGroup.add(outerCoreMesh);
 
-		// Bold wireframe facet overlay
-		const wireframeGeom = new THREE.WireframeGeometry(coreGeom);
-		const wireframeMat = new THREE.LineBasicMaterial({
-			color: 0x141210,
+		// Architectural Edge Lines (Using EdgesGeometry to outline true polygonal facets)
+		const edgesGeom = new THREE.EdgesGeometry(outerCoreGeom);
+		const edgesMat = new THREE.LineBasicMaterial({
+			color: 0x141210, // Near-black crisp ink bevels
+			linewidth: 2,
 			transparent: true,
-			opacity: 0.35,
+			opacity: 0.55,
 		});
-		disposables.push(wireframeGeom, wireframeMat);
-		const wireframeLines = new THREE.LineSegments(wireframeGeom, wireframeMat);
-		coreMesh.add(wireframeLines);
+		disposables.push(edgesGeom, edgesMat);
+		const edgeLines = new THREE.LineSegments(edgesGeom, edgesMat);
+		outerCoreMesh.add(edgeLines);
 
-		// Luminous inner core sphere
-		const innerCoreGeom = new THREE.SphereGeometry(1.05, 24, 24);
-		const innerCoreMat = new THREE.MeshBasicMaterial({
-			color: 0x188a7e,
-			wireframe: true,
+		// Inner Floating Geometric Kernel (Gold/Amber Octahedron)
+		const innerKernelGeom = new THREE.OctahedronGeometry(0.88, 0);
+		const innerKernelMat = new THREE.MeshStandardMaterial({
+			color: 0xc4602a, // Rich Amber
+			roughness: 0.2,
+			metalness: 0.7,
+			flatShading: true,
+		});
+		disposables.push(innerKernelGeom, innerKernelMat);
+		const innerKernelMesh = new THREE.Mesh(innerKernelGeom, innerKernelMat);
+		coreGroup.add(innerKernelMesh);
+
+		// Wireframe Halo around Kernel
+		const kernelEdges = new THREE.EdgesGeometry(innerKernelGeom);
+		const kernelEdgesMat = new THREE.LineBasicMaterial({
+			color: 0xffffff,
 			transparent: true,
-			opacity: 0.6,
+			opacity: 0.7,
 		});
-		disposables.push(innerCoreGeom, innerCoreMat);
-		const innerCoreMesh = new THREE.Mesh(innerCoreGeom, innerCoreMat);
-		systemGroup.add(innerCoreMesh);
+		disposables.push(kernelEdges, kernelEdgesMat);
+		const kernelEdgeLines = new THREE.LineSegments(kernelEdges, kernelEdgesMat);
+		innerKernelMesh.add(kernelEdgeLines);
 
-		// Orbital Torus Rings
-		const ringGeom1 = new THREE.TorusGeometry(3.6, 0.022, 16, 120);
-		const ringMat1 = new THREE.MeshBasicMaterial({
-			color: 0x0f5e56,
-			transparent: true,
-			opacity: 0.35,
+		// -------------------------------------------------------------
+		// 2. Volumetric Mechanical Gimbal Rings (Tangible Cross-Section)
+		// -------------------------------------------------------------
+		const ringGroup = new THREE.Group();
+		masterGroup.add(ringGroup);
+
+		// Primary Orbit Gimbal
+		const ring1Geom = new THREE.TorusGeometry(2.35, 0.045, 16, 90);
+		const ring1Mat = new THREE.MeshStandardMaterial({
+			color: 0x5c5852, // Muted slate ink
+			roughness: 0.3,
+			metalness: 0.5,
 		});
-		disposables.push(ringGeom1, ringMat1);
-		const ringMesh1 = new THREE.Mesh(ringGeom1, ringMat1);
-		ringMesh1.rotation.x = Math.PI / 3;
-		ringMesh1.rotation.y = Math.PI / 8;
-		systemGroup.add(ringMesh1);
+		disposables.push(ring1Geom, ring1Mat);
+		const ring1Mesh = new THREE.Mesh(ring1Geom, ring1Mat);
+		ring1Mesh.rotation.x = Math.PI / 3;
+		ring1Mesh.rotation.y = Math.PI / 10;
+		ringGroup.add(ring1Mesh);
 
-		const ringGeom2 = new THREE.TorusGeometry(4.4, 0.02, 16, 120);
-		const ringMat2 = new THREE.MeshBasicMaterial({
-			color: 0xc4602a, // Amber secondary orbit
-			transparent: true,
-			opacity: 0.28,
+		// Secondary Inclined Gimbal (Amber Accent Ring)
+		const ring2Geom = new THREE.TorusGeometry(2.75, 0.035, 16, 90);
+		const ring2Mat = new THREE.MeshStandardMaterial({
+			color: 0xc4602a, // Amber
+			roughness: 0.25,
+			metalness: 0.6,
 		});
-		disposables.push(ringGeom2, ringMat2);
-		const ringMesh2 = new THREE.Mesh(ringGeom2, ringMat2);
-		ringMesh2.rotation.x = -Math.PI / 3.5;
-		ringMesh2.rotation.y = -Math.PI / 6;
-		systemGroup.add(ringMesh2);
+		disposables.push(ring2Geom, ring2Mat);
+		const ring2Mesh = new THREE.Mesh(ring2Geom, ring2Mat);
+		ring2Mesh.rotation.x = -Math.PI / 4;
+		ring2Mesh.rotation.z = Math.PI / 6;
+		ringGroup.add(ring2Mesh);
 
-		// 2. Orbiting Autonomous Buyer Agent Nodes
-		const nodesData = [
-			{ name: 'Aura Agent (Autonomous Buyer)', pos: new THREE.Vector3(5.2, 1.6, 1.0), color: 0x0f5e56 },
-			{ name: 'Deterministic Guardrail Engine', pos: new THREE.Vector3(-4.9, -1.8, 1.4), color: 0xc4602a },
-			{ name: 'Soft-Hold Sweeper (30m TTL)', pos: new THREE.Vector3(3.4, -3.8, -1.6), color: 0x5c5852 },
-			{ name: 'Webhook Cryptographic Rail', pos: new THREE.Vector3(-4.2, 3.4, -1.2), color: 0x0f5e56 },
-			{ name: 'Catalog Authority Validator', pos: new THREE.Vector3(0.6, 4.6, 1.8), color: 0xc4602a },
-		];
-
-		const packetParticles: {
+		// -------------------------------------------------------------
+		// 3. Hardware Satellite Modules & Conduits
+		// -------------------------------------------------------------
+		const raycastTargets: { mesh: THREE.Mesh; data: NodeInfo }[] = [];
+		const packetStreams: {
 			mesh: THREE.Mesh;
 			start: THREE.Vector3;
 			end: THREE.Vector3;
@@ -132,99 +208,138 @@ export default function AgentNeuralCanvas() {
 			speed: number;
 		}[] = [];
 
-		nodesData.forEach((node) => {
-			// Solid node sphere with specular highlight
-			const nodeGeom = new THREE.SphereGeometry(0.42, 24, 24);
-			const nodeMat = new THREE.MeshStandardMaterial({
-				color: node.color,
+		NODES_METADATA.forEach((node) => {
+			const nodePos = new THREE.Vector3(...node.pos);
+
+			// Node Pod Container
+			const podGroup = new THREE.Group();
+			podGroup.position.copy(nodePos);
+			masterGroup.add(podGroup);
+
+			// Chamfered Hardware Pod: Cylinder housing
+			const podHousingGeom = new THREE.CylinderGeometry(0.28, 0.32, 0.28, 12);
+			const podHousingMat = new THREE.MeshStandardMaterial({
+				color: 0xffffff,
 				roughness: 0.2,
-				metalness: 0.1,
+				metalness: 0.3,
 			});
-			disposables.push(nodeGeom, nodeMat);
-			const nodeMesh = new THREE.Mesh(nodeGeom, nodeMat);
-			nodeMesh.position.copy(node.pos);
-			systemGroup.add(nodeMesh);
+			disposables.push(podHousingGeom, podHousingMat);
+			const podMesh = new THREE.Mesh(podHousingGeom, podHousingMat);
+			podMesh.rotation.x = Math.PI / 4;
+			podMesh.rotation.z = Math.PI / 6;
+			podGroup.add(podMesh);
 
-			// Outer subtle halo ring
-			const haloGeom = new THREE.RingGeometry(0.55, 0.62, 32);
-			const haloMat = new THREE.MeshBasicMaterial({
+			// Indicator Jewel atop the pod
+			const jewelGeom = new THREE.OctahedronGeometry(0.18, 0);
+			const jewelMat = new THREE.MeshStandardMaterial({
 				color: node.color,
-				side: THREE.DoubleSide,
-				transparent: true,
-				opacity: 0.45,
+				roughness: 0.1,
+				metalness: 0.4,
+				flatShading: true,
 			});
-			disposables.push(haloGeom, haloMat);
-			const haloMesh = new THREE.Mesh(haloGeom, haloMat);
-			haloMesh.position.copy(node.pos);
-			haloMesh.lookAt(camera.position);
-			systemGroup.add(haloMesh);
+			disposables.push(jewelGeom, jewelMat);
+			const jewelMesh = new THREE.Mesh(jewelGeom, jewelMat);
+			jewelMesh.position.set(0, 0.22, 0);
+			podGroup.add(jewelMesh);
 
-			// Visible transaction rail line to core
-			const railPoints = [node.pos, new THREE.Vector3(0, 0, 0)];
+			raycastTargets.push({ mesh: podMesh, data: node });
+
+			// Physical Conduit Rail to Settlement Core
+			const railPoints = [nodePos, new THREE.Vector3(0, 0, 0)];
 			const railGeom = new THREE.BufferGeometry().setFromPoints(railPoints);
 			const railMat = new THREE.LineBasicMaterial({
 				color: 0xc5d8d4,
 				transparent: true,
-				opacity: 0.7,
+				opacity: 0.8,
 			});
 			disposables.push(railGeom, railMat);
 			const railLine = new THREE.Line(railGeom, railMat);
-			systemGroup.add(railLine);
+			masterGroup.add(railLine);
 
-			// Animated transaction pulse packet
-			const packetGeom = new THREE.SphereGeometry(0.14, 12, 12);
-			const packetMat = new THREE.MeshBasicMaterial({
-				color: node.color === 0xc4602a ? 0xc4602a : 0x0f5e56,
+			// Volumetric Kinetic Transaction Packet
+			const packetGeom = new THREE.SphereGeometry(0.1, 12, 12);
+			const packetMat = new THREE.MeshStandardMaterial({
+				color: node.color,
+				roughness: 0.15,
+				metalness: 0.3,
 			});
 			disposables.push(packetGeom, packetMat);
 			const packetMesh = new THREE.Mesh(packetGeom, packetMat);
-			packetMesh.position.copy(node.pos);
-			systemGroup.add(packetMesh);
+			masterGroup.add(packetMesh);
 
-			packetParticles.push({
+			packetStreams.push({
 				mesh: packetMesh,
-				start: node.pos.clone(),
+				start: nodePos.clone(),
 				end: new THREE.Vector3(0, 0, 0),
 				progress: Math.random(),
-				speed: 0.007 + Math.random() * 0.005,
+				speed: 0.008 + Math.random() * 0.004,
 			});
 		});
 
-		// 3. Subtle Ambient Particle Dust (Warm Gray/Stone)
-		const particleCount = 140;
-		const particlePositions = new Float32Array(particleCount * 3);
-		for (let i = 0; i < particleCount * 3; i += 3) {
-			particlePositions[i] = (Math.random() - 0.5) * 28;
-			particlePositions[i + 1] = (Math.random() - 0.5) * 20;
-			particlePositions[i + 2] = (Math.random() - 0.5) * 16;
+		// -------------------------------------------------------------
+		// 4. Subtle Architectural Coordinate Markers
+		// -------------------------------------------------------------
+		const ticksCount = 48;
+		const tickPositions = new Float32Array(ticksCount * 3);
+		for (let i = 0; i < ticksCount; i++) {
+			const angle = (i / ticksCount) * Math.PI * 2;
+			const radius = 3.6;
+			tickPositions[i * 3] = Math.cos(angle) * radius;
+			tickPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.4;
+			tickPositions[i * 3 + 2] = Math.sin(angle) * radius;
 		}
-		const particlesGeom = new THREE.BufferGeometry();
-		particlesGeom.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-		const particlesMat = new THREE.PointsMaterial({
-			color: 0xb5b0a4,
-			size: 0.08,
+		const ticksGeom = new THREE.BufferGeometry();
+		ticksGeom.setAttribute('position', new THREE.BufferAttribute(tickPositions, 3));
+		const ticksMat = new THREE.PointsMaterial({
+			color: 0x0f5e56,
+			size: 0.06,
 			transparent: true,
-			opacity: 0.55,
+			opacity: 0.5,
 		});
-		disposables.push(particlesGeom, particlesMat);
-		const particlePoints = new THREE.Points(particlesGeom, particlesMat);
-		scene.add(particlePoints);
+		disposables.push(ticksGeom, ticksMat);
+		const tickPoints = new THREE.Points(ticksGeom, ticksMat);
+		masterGroup.add(tickPoints);
 
-		// Mouse Interaction
-		let mouseX = 0;
-		let mouseY = 0;
-		let targetRotationX = 0;
-		let targetRotationY = 0;
+		// -------------------------------------------------------------
+		// 5. Interactive Cursor Tracking & Smooth Lerp
+		// -------------------------------------------------------------
+		let targetRotX = 0;
+		let targetRotY = 0;
+		const raycaster = new THREE.Raycaster();
+		const mouseVec = new THREE.Vector2(-999, -999);
 
 		const handleMouseMove = (event: MouseEvent) => {
 			const rect = container.getBoundingClientRect();
-			const x = (event.clientX - rect.left) / rect.width - 0.5;
-			const y = (event.clientY - rect.top) / rect.height - 0.5;
-			mouseX = x * 2;
-			mouseY = y * 2;
+			const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+			const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+			mouseVec.x = x;
+			mouseVec.y = y;
+
+			targetRotY = x * 0.45;
+			targetRotX = -y * 0.35;
+
+			// Raycast check
+			raycaster.setFromCamera(mouseVec, camera);
+			const intersects = raycaster.intersectObjects(raycastTargets.map((t) => t.mesh));
+			if (intersects.length > 0) {
+				const hit = raycastTargets.find((t) => t.mesh === intersects[0].object);
+				if (hit) {
+					setActiveNode(hit.data);
+					return;
+				}
+			}
+			setActiveNode(null);
 		};
 
-		window.addEventListener('mousemove', handleMouseMove);
+		const handleMouseLeave = () => {
+			targetRotX = 0;
+			targetRotY = 0;
+			setActiveNode(null);
+		};
+
+		container.addEventListener('mousemove', handleMouseMove);
+		container.addEventListener('mouseleave', handleMouseLeave);
 
 		// Resize Handling
 		const handleResize = () => {
@@ -243,28 +358,28 @@ export default function AgentNeuralCanvas() {
 		let animationFrameId: number;
 		const clock = new THREE.Clock();
 
-		const renderLoop = () => {
+		const render = () => {
+			const delta = clock.getDelta();
 			const elapsedTime = clock.getElapsedTime();
 
 			if (!prefersReducedMotion) {
-				// Smooth camera / group rotation with mouse parallax
-				targetRotationY = mouseX * 0.35;
-				targetRotationX = mouseY * 0.25;
+				// Smooth Parallax Lerp
+				masterGroup.rotation.y += (targetRotY - masterGroup.rotation.y) * 0.06;
+				masterGroup.rotation.x += (targetRotX - masterGroup.rotation.x) * 0.06;
 
-				systemGroup.rotation.y += 0.0025;
-				systemGroup.rotation.x += (targetRotationX - systemGroup.rotation.x) * 0.05;
-				systemGroup.rotation.z += (targetRotationY - systemGroup.rotation.z) * 0.05;
+				// Kinetic Rotation of Core
+				outerCoreMesh.rotation.y += delta * 0.32;
+				outerCoreMesh.rotation.x += delta * 0.16;
 
-				// Core rotation
-				coreMesh.rotation.y = elapsedTime * 0.35;
-				coreMesh.rotation.x = elapsedTime * 0.2;
-				innerCoreMesh.rotation.y = -elapsedTime * 0.28;
+				innerKernelMesh.rotation.y -= delta * 0.55;
+				innerKernelMesh.rotation.z += delta * 0.28;
 
-				ringMesh1.rotation.z = elapsedTime * 0.15;
-				ringMesh2.rotation.z = -elapsedTime * 0.18;
+				// Counter-rotating mechanical gimbals
+				ring1Mesh.rotation.z += delta * 0.12;
+				ring2Mesh.rotation.z -= delta * 0.16;
 
-				// Move transaction packets along rails
-				packetParticles.forEach((packet) => {
+				// Advance transaction packets along rails
+				packetStreams.forEach((packet) => {
 					packet.progress += packet.speed;
 					if (packet.progress > 1) {
 						packet.progress = 0;
@@ -272,19 +387,20 @@ export default function AgentNeuralCanvas() {
 					packet.mesh.position.lerpVectors(packet.start, packet.end, packet.progress);
 				});
 
-				particlePoints.rotation.y = elapsedTime * 0.008;
+				tickPoints.rotation.y += delta * 0.05;
 			}
 
 			renderer.render(scene, camera);
-			animationFrameId = requestAnimationFrame(renderLoop);
+			animationFrameId = requestAnimationFrame(render);
 		};
 
-		renderLoop();
+		render();
 
-		// Cleanup on unmount
+		// Complete Unmount Cleanup
 		return () => {
 			cancelAnimationFrame(animationFrameId);
-			window.removeEventListener('mousemove', handleMouseMove);
+			container.removeEventListener('mousemove', handleMouseMove);
+			container.removeEventListener('mouseleave', handleMouseLeave);
 			window.removeEventListener('resize', handleResize);
 
 			disposables.forEach((item) => {
@@ -299,27 +415,53 @@ export default function AgentNeuralCanvas() {
 	}, []);
 
 	return (
-		<div className="relative w-full h-[380px] md:h-[460px] lg:h-[500px] flex items-center justify-center overflow-hidden rounded-2xl bg-[#FAF9F6] border border-[#E8E5DF] shadow-bridge">
-			{/* Three.js canvas container */}
-			<div ref={containerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
-
-			{/* Soft radial focus overlay */}
-			<div
-				className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_50%,rgba(250,249,246,0.8)_95%)]"
-				aria-hidden="true"
-			/>
-
-			{/* Technical Corner Annotations */}
-			<div className="absolute top-4 left-5 font-mono text-[10px] text-[#5C5852] flex items-center gap-2 pointer-events-none bg-[#FAF9F6]/85 backdrop-blur-sm border border-[#E8E5DF] px-2.5 py-1 rounded">
-				<span className="w-1.5 h-1.5 rounded-full bg-[#0F5E56]"></span>
-				<span className="font-semibold text-[#141210]">AGENTPAY_TOPOLOGY</span>
-				<span className="text-[#8C8880]">// LIVE_ORBIT</span>
+		<div className="relative w-full h-[380px] sm:h-[420px] lg:h-[440px] flex flex-col justify-between overflow-hidden rounded-2xl bg-[#FAF9F6] border border-[#E8E5DF] shadow-bridge transition-all">
+			{/* Top Monospace Technical Status Bar */}
+			<div className="relative z-10 flex items-center justify-between px-5 py-3.5 border-b border-[#E8E5DF] bg-[#FAF9F6]/90 backdrop-blur-sm">
+				<div className="flex items-center gap-2 font-mono text-[11px] text-[#141210] font-semibold">
+					<span className="w-2 h-2 rounded-full bg-[#0F5E56] animate-pulse"></span>
+					<span>BRIDGE_KERNEL: ACTIVE</span>
+				</div>
+				<div className="font-mono text-[10px] text-[#5C5852] uppercase tracking-wider">
+					ACP // DETERMINISTIC RAILS
+				</div>
 			</div>
 
-			<div className="absolute bottom-4 right-5 font-mono text-[10px] text-[#8C8880] pointer-events-none bg-[#FAF9F6]/85 backdrop-blur-sm border border-[#E8E5DF] px-2.5 py-1 rounded">
-				INTERACTIVE 3D RAIL [PARALLAX ACTIVE]
+			{/* Three.js Interactive Viewport */}
+			<div className="relative flex-1 w-full h-full">
+				<div ref={containerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
+
+				{/* Subtle Focus Radial Gradient (blends edges softly into #FAF9F6) */}
+				<div
+					className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_45%,rgba(250,249,246,0.85)_92%)]"
+					aria-hidden="true"
+				/>
+
+				{/* Dynamic Node Hover Telemetry Overlay */}
+				{activeNode && (
+					<div className="absolute top-4 left-4 z-20 pointer-events-none p-3 rounded-lg bg-white/95 border border-[#C5D8D4] shadow-bridge max-w-xs font-mono transition-all animate-in fade-in">
+						<div className="flex items-center justify-between gap-2 pb-1 border-b border-[#E8E5DF]">
+							<span className="text-[11px] font-bold text-[#0F5E56]">{activeNode.title}</span>
+							<span className="text-[9px] px-1.5 py-0.5 rounded bg-[#E6F0EE] text-[#0F5E56] font-bold">
+								{activeNode.status}
+							</span>
+						</div>
+						<div className="text-[10px] text-[#5C5852] pt-1">{activeNode.role}</div>
+					</div>
+				)}
+			</div>
+
+			{/* Bottom Telemetry Footer */}
+			<div className="relative z-10 flex items-center justify-between px-5 py-3 border-t border-[#E8E5DF] bg-[#FAF9F6]/90 backdrop-blur-sm font-mono text-[10px] text-[#5C5852]">
+				<div className="flex items-center gap-2">
+					<span className="text-[#0F5E56] font-bold">4 NODES CONNECTED</span>
+					<span className="text-[#C5D8D4]">/</span>
+					<span>MUTEX LOCKED</span>
+				</div>
+				<span className="text-[9px] text-[#8C8880] uppercase tracking-wider">
+					PARALLAX ROTATION ENABLED
+				</span>
 			</div>
 		</div>
 	);
 }
-

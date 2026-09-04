@@ -80,64 +80,83 @@ const session = await client.checkout.createSession({
 			{/* Persistent Header */}
 			<Navbar />
 
-			{/* Hero Section */}
-			<section className="relative pt-12 pb-20 md:pt-20 md:pb-28 overflow-hidden border-b border-[#E8E5DF]">
+			{/* Hero Section: Asymmetric Editorial Split */}
+			<section className="relative pt-10 pb-16 md:pt-16 md:pb-24 overflow-hidden border-b border-[#E8E5DF]">
 				<div className="max-w-7xl mx-auto px-6 relative z-10">
-					<div className="flex flex-col items-center text-center space-y-6 max-w-4xl mx-auto">
-						{/* Protocol and Rail Badges */}
-						<div className="flex flex-wrap items-center justify-center gap-2.5">
-							<div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E6F0EE] border border-[#C5D8D4] text-[#0F5E56] text-xs font-mono font-medium">
-								<span className="w-1.5 h-1.5 rounded-full bg-[#0F5E56]"></span>
-								<span>ACP v2026-04-17 Spec</span>
-								<span className="text-[#A3BEBA]">|</span>
-								<span className="text-[#141210] font-semibold">Track 01</span>
+					<div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+						{/* Left Column (7 cols): Editorial Copy & CTAs */}
+						<div className="lg:col-span-7 space-y-6 text-left">
+							{/* Protocol and Rail Badges */}
+							<div className="flex flex-wrap items-center gap-2.5">
+								<div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E6F0EE] border border-[#C5D8D4] text-[#0F5E56] text-xs font-mono font-medium">
+									<span className="w-1.5 h-1.5 rounded-full bg-[#0F5E56]"></span>
+									<span>ACP v2026-04-17 Spec</span>
+									<span className="text-[#A3BEBA]">|</span>
+									<span className="text-[#141210] font-semibold">Track 01</span>
+								</div>
+								<div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-[#E8E5DF] text-[#5C5852] text-xs font-mono font-medium shadow-sm">
+									<span>Payment rail: Razorpay</span>
+								</div>
 							</div>
-							<div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-[#E8E5DF] text-[#5C5852] text-xs font-mono font-medium shadow-sm">
-								<span>Payment rail: Razorpay</span>
+
+							{/* Main Editorial Display Headline in Fraunces */}
+							<h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-serif font-bold tracking-tight text-[#141210] leading-[1.12]">
+								ACP-Compliant Checkout Rail for{' '}
+								<span className="italic text-[#0F5E56]">Autonomous AI</span> Buyer Agents
+							</h1>
+
+							{/* Subheadline */}
+							<p className="text-sm sm:text-base text-[#5C5852] max-w-xl leading-relaxed font-normal">
+								Translates raw autonomous AI agent purchasing intents into bounded, gated, and auditable
+								orders on the Razorpay rail. Enforcing server-authoritative catalog pricing, deterministic
+								guardrails, 30-min inventory soft-holds, and zero-hallucination checkouts.
+							</p>
+
+							{/* Dual CTAs in Deep Teal & Neutral Frame */}
+							<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+								<Link
+									href="/dashboard"
+									className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-white bg-[#0F5E56] hover:bg-[#09433D] transition-all shadow-sm active:scale-[0.98]"
+								>
+									<Activity className="w-4 h-4 text-[#E6F0EE]" />
+									<span>Launch Live Dashboard</span>
+									<ArrowRight className="w-4 h-4 text-[#E6F0EE]" />
+								</Link>
+
+								<a
+									href="#playground"
+									className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#141210] bg-white hover:bg-[#F4F1EC] border border-[#E8E5DF] transition-all shadow-sm"
+								>
+									<Terminal className="w-4 h-4 text-[#0F5E56]" />
+									<span>Protocol Sandbox</span>
+								</a>
+							</div>
+
+							{/* Technical Architecture Safeguards */}
+							<div className="pt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-mono text-[#5C5852]">
+								<div className="flex items-center gap-1.5">
+									<Check className="w-3.5 h-3.5 text-[#0F5E56]" />
+									<span>Server Catalog Authority</span>
+								</div>
+								<div className="flex items-center gap-1.5">
+									<Check className="w-3.5 h-3.5 text-[#0F5E56]" />
+									<span>30m TTL Stock Mutex</span>
+								</div>
+								<div className="flex items-center gap-1.5">
+									<Check className="w-3.5 h-3.5 text-[#0F5E56]" />
+									<span>Deterministic FSM Gating</span>
+								</div>
 							</div>
 						</div>
 
-						{/* Main Editorial Display Headline in Fraunces */}
-						<h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-bold tracking-tight text-[#141210] leading-[1.12]">
-							ACP-Compliant Checkout Rail for{' '}
-							<span className="italic text-[#0F5E56]">Autonomous AI</span> Buyer Agents
-						</h1>
-
-						{/* Subheadline */}
-						<p className="text-base sm:text-lg text-[#5C5852] max-w-2xl leading-relaxed font-normal">
-							Translates raw autonomous AI agent purchasing intents into bounded, gated, and auditable
-							orders on the Razorpay rail. Enforcing server-authoritative catalog pricing, deterministic
-							guardrails, 30-min inventory soft-holds, and zero-hallucination checkouts.
-						</p>
-
-						{/* Dual CTAs in Deep Teal & Neutral Frame */}
-						<div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-							<Link
-								href="/dashboard"
-								className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-white bg-[#0F5E56] hover:bg-[#09433D] transition-all shadow-sm active:scale-[0.98]"
-							>
-								<Activity className="w-4 h-4 text-[#E6F0EE]" />
-								<span>Launch Live Dashboard</span>
-								<ArrowRight className="w-4 h-4 text-[#E6F0EE]" />
-							</Link>
-
-							<a
-								href="#playground"
-								className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#141210] bg-white hover:bg-[#F4F1EC] border border-[#E8E5DF] transition-all shadow-sm"
-							>
-								<Terminal className="w-4 h-4 text-[#0F5E56]" />
-								<span>Protocol Sandbox</span>
-							</a>
+						{/* Right Column (5 cols): 3D Architectural Instrument Console */}
+						<div className="lg:col-span-5 w-full">
+							<AgentNeuralCanvas />
 						</div>
-					</div>
-
-					{/* Rebuilt 3D WebGL Neural Canvas Visual */}
-					<div className="mt-12 pt-2 relative max-w-5xl mx-auto">
-						<AgentNeuralCanvas />
 					</div>
 
 					{/* Live Stat Bar (Editorial Technical Panels) */}
-					<div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
+					<div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-7xl mx-auto">
 						<div className="p-5 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge">
 							<div className="text-[11px] text-[#5C5852] font-mono font-medium uppercase tracking-wider">
 								01 // TEST SUITE

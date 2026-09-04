@@ -9,34 +9,36 @@ const config: Config = {
 	theme: {
 		extend: {
 			colors: {
-				background: '#090a0f',
-				foreground: '#f8fafc',
-				primary: {
-					DEFAULT: '#3b82f6',
-					foreground: '#ffffff',
+				razorpay: {
+					blue: '#0c66e4',
+					blueHover: '#0052cc',
+					navy: '#0b192c',
+					dark: '#02042b',
+					cyan: '#00baf2',
+					emerald: '#059669',
+					mint: '#10b981',
+					slate: '#f8fafc',
 				},
+				background: '#ffffff',
+				foreground: '#0b192c',
 				card: {
-					DEFAULT: '#11131f',
-					foreground: '#f8fafc',
-					border: '#1e2238',
-				},
-				accent: {
-					DEFAULT: '#00dc82',
-					foreground: '#090a0f',
+					DEFAULT: '#ffffff',
+					foreground: '#0b192c',
+					border: '#e2e8f0',
 				},
 				muted: {
-					DEFAULT: '#1e293b',
-					foreground: '#94a3b8',
+					DEFAULT: '#f1f5f9',
+					foreground: '#64748b',
 				},
-				danger: {
-					DEFAULT: '#ef4444',
-					foreground: '#ffffff',
-				}
 			},
 			fontFamily: {
-				sans: ['Inter', 'sans-serif'],
-				mono: ['JetBrains Mono', 'monospace'],
+				sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+				mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
 			},
+			boxShadow: {
+				'razorpay': '0 10px 30px -5px rgba(12, 102, 228, 0.08), 0 4px 6px -2px rgba(12, 102, 228, 0.04)',
+				'razorpay-hover': '0 20px 35px -5px rgba(12, 102, 228, 0.15), 0 8px 10px -3px rgba(12, 102, 228, 0.08)',
+			}
 		},
 	},
 	plugins: [],

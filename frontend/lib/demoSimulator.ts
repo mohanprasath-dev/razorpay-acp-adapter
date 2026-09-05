@@ -30,6 +30,41 @@ export interface SimResult {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let cachedApiKey: string | null = null;
+
+export async function getOrRegisterApiKey(): Promise<string> {
+	if (cachedApiKey) return cachedApiKey;
+	try {
+		const res = await fetch(`${API_BASE_URL}/agents/register`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name: 'Aura Autonomous Buyer Agent #42' }),
+		});
+		if (res.ok) {
+			const data = await res.json();
+			if (data.api_key) {
+				cachedApiKey = String(data.api_key);
+				return cachedApiKey;
+			}
+		}
+	} catch (err) {
+		console.error('Failed to register agent for demo:', err);
+	}
+	return cachedApiKey || '';
+}
+
+async function getAuthHeaders(extraHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
+	const apiKey = await getOrRegisterApiKey();
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+		...extraHeaders,
+	};
+	if (apiKey) {
+		headers['X-API-Key'] = apiKey;
+	}
+	return headers;
+}
+
 function makeStep(
 	act: string,
 	title: string,
@@ -78,6 +113,9 @@ export async function runHappyPathDemo(
 		await sleep(delayMs);
 
 		const prodRes = await fetch(`${API_BASE_URL}/products`, { cache: 'no-store' });
+		if (!prodRes.ok) {
+			throw new Error(`Failed to fetch catalog (HTTP ${prodRes.status})`);
+		}
 		const products = await prodRes.json();
 		s1.status = 'success';
 		s1.statusCode = prodRes.status;
@@ -108,12 +146,21 @@ export async function runHappyPathDemo(
 		emit(s2);
 		await sleep(delayMs);
 
+		const authHeaders = await getAuthHeaders();
 		const createRes = await fetch(`${API_BASE_URL}/checkout_sessions`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 			body: JSON.stringify(createPayload),
 		});
 		const createdSession = await createRes.json();
+		if (!createRes.ok || !createdSession.id) {
+			const errMsg = createdSession.detail?.message || createdSession.detail || `HTTP ${createRes.status} creating session`;
+			s2.status = 'error';
+			s2.statusCode = createRes.status;
+			s2.response = createdSession;
+			if (onLog) onLog({ ...s2 });
+			throw new Error(errMsg);
+		}
 		const sessionId = createdSession.id;
 
 		s2.status = 'success';
@@ -151,10 +198,18 @@ export async function runHappyPathDemo(
 
 		const updateRes = await fetch(`${API_BASE_URL}/checkout_sessions/${sessionId}`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 			body: JSON.stringify(updatePayload),
 		});
 		const updatedSession = await updateRes.json();
+		if (!updateRes.ok) {
+			const errMsg = updatedSession.detail?.message || updatedSession.detail || `HTTP ${updateRes.status} updating cart`;
+			s3.status = 'error';
+			s3.statusCode = updateRes.status;
+			s3.response = updatedSession;
+			if (onLog) onLog({ ...s3 });
+			throw new Error(errMsg);
+		}
 
 		s3.status = 'success';
 		s3.statusCode = updateRes.status;
@@ -182,10 +237,18 @@ export async function runHappyPathDemo(
 
 		const tokenRes = await fetch(`${API_BASE_URL}/checkout_sessions/${sessionId}/payment_method`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 			body: JSON.stringify(tokenPayload),
 		});
 		const tokenSession = await tokenRes.json();
+		if (!tokenRes.ok) {
+			const errMsg = tokenSession.detail?.message || tokenSession.detail || `HTTP ${tokenRes.status} attaching payment`;
+			s4.status = 'error';
+			s4.statusCode = tokenRes.status;
+			s4.response = tokenSession;
+			if (onLog) onLog({ ...s4 });
+			throw new Error(errMsg);
+		}
 		s4.status = 'success';
 		s4.statusCode = tokenRes.status;
 		s4.response = { status: tokenSession.status };
@@ -205,9 +268,17 @@ export async function runHappyPathDemo(
 
 		const completeRes = await fetch(`${API_BASE_URL}/checkout_sessions/${sessionId}/complete`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 		});
 		const completedSession = await completeRes.json();
+		if (!completeRes.ok) {
+			const errMsg = completedSession.detail?.message || completedSession.detail || `HTTP ${completeRes.status} completing session`;
+			s5.status = 'error';
+			s5.statusCode = completeRes.status;
+			s5.response = completedSession;
+			if (onLog) onLog({ ...s5 });
+			throw new Error(errMsg);
+		}
 
 		const razorpayOrderId = completedSession.payment_provider?.razorpay_order_id;
 		s5.status = 'success';
@@ -253,6 +324,8 @@ export async function runViolationDemo(
 	};
 
 	try {
+		const authHeaders = await getAuthHeaders();
+
 		// Attack 3A: Client-Side Price Tampering
 		const tamperPayload = {
 			line_items: [{ product_id: 'prod_bolt_001', quantity: 1, unit_price: 1.0 }],
@@ -272,10 +345,18 @@ export async function runViolationDemo(
 
 		const tamperRes = await fetch(`${API_BASE_URL}/checkout_sessions`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 			body: JSON.stringify(tamperPayload),
 		});
 		const tamperSession = await tamperRes.json();
+		if (!tamperRes.ok || !tamperSession.id) {
+			const errMsg = tamperSession.detail?.message || tamperSession.detail || `HTTP ${tamperRes.status} in price tampering test`;
+			s1.status = 'error';
+			s1.statusCode = tamperRes.status;
+			s1.response = tamperSession;
+			if (onLog) onLog({ ...s1 });
+			throw new Error(errMsg);
+		}
 		const sid = tamperSession.id;
 
 		s1.status = 'success';
@@ -307,7 +388,7 @@ export async function runViolationDemo(
 
 		const breachRes = await fetch(`${API_BASE_URL}/checkout_sessions/${sid}`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 			body: JSON.stringify(breachPayload),
 		});
 		const breachData = await breachRes.json();
@@ -343,21 +424,29 @@ export async function runViolationDemo(
 
 		const freshRes = await fetch(`${API_BASE_URL}/checkout_sessions`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 			body: JSON.stringify(recoverPayload),
 		});
 		const freshSession = await freshRes.json();
+		if (!freshRes.ok || !freshSession.id) {
+			const errMsg = freshSession.detail?.message || freshSession.detail || `HTTP ${freshRes.status} in recovery flow`;
+			s3.status = 'error';
+			s3.statusCode = freshRes.status;
+			s3.response = freshSession;
+			if (onLog) onLog({ ...s3 });
+			throw new Error(errMsg);
+		}
 		const freshId = freshSession.id;
 
 		await fetch(`${API_BASE_URL}/checkout_sessions/${freshId}/payment_method`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 			body: JSON.stringify({ token: `pm_tok_${Math.random().toString(36).substring(2, 12)}` }),
 		});
 
 		const compRes = await fetch(`${API_BASE_URL}/checkout_sessions/${freshId}/complete`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: authHeaders,
 		});
 		const finalSession = await compRes.json();
 
@@ -420,15 +509,22 @@ export async function runIdempotencyDemo(
 		emit(s1);
 		await sleep(delayMs);
 
+		const authHeaders1 = await getAuthHeaders({ 'Idempotency-Key': idempotencyKey });
 		const res1 = await fetch(`${API_BASE_URL}/checkout_sessions`, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Idempotency-Key': idempotencyKey,
-			},
+			headers: authHeaders1,
 			body: JSON.stringify(payload),
 		});
 		const session1 = await res1.json();
+		if (!res1.ok || !session1.id) {
+			const errMsg = session1.detail?.message || session1.detail || `HTTP ${res1.status} creating idempotent session`;
+			s1.status = 'error';
+			s1.statusCode = res1.status;
+			s1.response = session1;
+			if (onLog) onLog({ ...s1 });
+			throw new Error(errMsg);
+		}
+
 		s1.status = 'success';
 		s1.statusCode = res1.status;
 		s1.response = { session_id: session1.id, status: session1.status };
@@ -449,13 +545,18 @@ export async function runIdempotencyDemo(
 
 		const res2 = await fetch(`${API_BASE_URL}/checkout_sessions`, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Idempotency-Key': idempotencyKey,
-			},
+			headers: authHeaders1,
 			body: JSON.stringify(payload),
 		});
 		const session2 = await res2.json();
+		if (!res2.ok || !session2.id) {
+			const errMsg = session2.detail?.message || session2.detail || `HTTP ${res2.status} replaying idempotent session`;
+			s2.status = 'error';
+			s2.statusCode = res2.status;
+			s2.response = session2;
+			if (onLog) onLog({ ...s2 });
+			throw new Error(errMsg);
+		}
 
 		const isIdentical = session1.id === session2.id;
 		s2.status = 'success';

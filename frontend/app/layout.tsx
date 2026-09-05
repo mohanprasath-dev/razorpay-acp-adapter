@@ -11,7 +11,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-	metadataBase: new URL('https://agentpay-bridge.taskdrift.com'),
+	metadataBase: new URL('https://agentpay-bridge.vercel.app'),
 	title: {
 		default: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
 		template: '%s | AgentPay Bridge',
@@ -28,12 +28,12 @@ export const metadata: Metadata = {
 		'Deterministic Guardrails',
 	],
 	authors: [{ name: 'Mohan Prasath', url: 'https://github.com/mohanprasath-dev' }],
-	creator: 'Mohan Prasath (TaskDrift)',
+	creator: 'Mohan Prasath',
 	openGraph: {
 		title: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
 		description:
 			'ACP-compliant checkout adapter for autonomous AI buyer agents. Server-authoritative catalog pricing, deterministic guardrails, 30-min inventory soft-holds, and immutable audit trails. Payment rail: Razorpay.',
-		url: 'https://agentpay-bridge.taskdrift.com',
+		url: 'https://agentpay-bridge.vercel.app',
 		siteName: 'AgentPay Bridge',
 		locale: 'en_US',
 		type: 'website',
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 		title: 'AgentPay Bridge | ACP Checkout Adapter for AI Buyer Agents',
 		description:
 			'ACP-compliant checkout adapter for autonomous AI buyer agents. Payment rail: Razorpay.',
-		creator: '@taskdrift',
+		creator: '@mohanprasath',
 	},
 	icons: {
 		icon: [

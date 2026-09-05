@@ -142,7 +142,7 @@ def test_session_with_full_details_transitions_to_ready_for_payment_and_complete
 	update_payload = {
 		'buyer': {
 			'name': 'Agent Buyer',
-			'email': 'agent@taskdrift.com',
+			'email': 'agent@buyer.internal',
 			'phone': '+919876543210'
 		},
 		'fulfillment_address': {

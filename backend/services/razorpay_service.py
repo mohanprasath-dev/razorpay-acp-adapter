@@ -40,7 +40,7 @@ def create_order(
 ) -> Dict[str, Any]:
 	"""
 	Creates a Razorpay test-mode Order scoped to the exact ACP checkout session total.
-	Reuses TaskDrift enterprise retry and backoff mechanism for payment rail resilience.
+	Reuses enterprise retry and backoff mechanism for payment rail resilience.
 	"""
 	if amount <= 0:
 		raise ValueError(f'Order amount must be positive. Received: {amount}')
@@ -54,7 +54,7 @@ def create_order(
 		'receipt': session_id,
 		'notes': notes or {
 			'session_id': session_id,
-			'source': 'taskdrift_acp_adapter',
+			'source': 'razorpay_acp_adapter',
 			'protocol': 'ACP_2026-04-17'
 		}
 	}

@@ -24,7 +24,7 @@ SEED_PRODUCTS: List[Dict[str, Any]] = [
 	},
 	{
 		'id': 'prod_bolt_002',
-		'name': 'TaskDrift Pro Website Audit & Optimization',
+		'name': 'Pro Website Audit & Optimization',
 		'price': 4999.0,
 		'currency': 'INR',
 		'description': 'Comprehensive Lighthouse, SEO, and Three.js performance tuning package.',

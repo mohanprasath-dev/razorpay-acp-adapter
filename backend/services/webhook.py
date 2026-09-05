@@ -137,7 +137,7 @@ def dispatch_webhook_event(
 				data=payload_str.encode('utf-8'),
 				headers={
 					'Content-Type': 'application/json',
-					'User-Agent': 'TaskDrift-ACP-Adapter-Webhook/1.0',
+					'User-Agent': 'Razorpay-ACP-Adapter-Webhook/1.0',
 					'X-ACP-Signature': signature_header,
 					'X-ACP-Timestamp': timestamp
 				},

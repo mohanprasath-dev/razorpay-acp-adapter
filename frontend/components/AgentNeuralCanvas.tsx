@@ -18,7 +18,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Aura Agent',
 		role: 'Autonomous Buyer Intent',
 		color: 0x0f5e56, // Deep Teal
-		pos: [2.6, 1.1, 0.4],
+		pos: [2.25, 0.95, 0.35],
 		status: 'DISPATCHING',
 	},
 	{
@@ -26,7 +26,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Guardrail Mutex',
 		role: 'Deterministic Rule Engine',
 		color: 0xc4602a, // Rich Amber
-		pos: [-2.5, -0.9, 0.6],
+		pos: [-2.15, -0.75, 0.5],
 		status: 'ENFORCING',
 	},
 	{
@@ -34,7 +34,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Stock Lock',
 		role: '30-Min TTL Soft-Hold',
 		color: 0x3d7068, // Mineral Teal
-		pos: [1.8, -1.8, -0.8],
+		pos: [1.55, -1.55, -0.7],
 		status: 'RESERVED',
 	},
 	{
@@ -42,7 +42,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Settlement Rail',
 		role: 'Razorpay Orders API',
 		color: 0x0f5e56, // Deep Teal
-		pos: [-2.0, 1.8, -0.6],
+		pos: [-1.75, 1.55, -0.5],
 		status: 'SYNCHRONIZED',
 	},
 ];
@@ -63,9 +63,9 @@ export default function AgentNeuralCanvas() {
 		const width = container.clientWidth || 500;
 		const height = container.clientHeight || 440;
 
-		// Close camera for high physical presence and tangible scale
+		// Optimal camera framing for balanced architectural scale
 		const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-		camera.position.set(0, 0.3, 7.4);
+		camera.position.set(0, 0.2, 7.2);
 
 		const renderer = new THREE.WebGLRenderer({
 			antialias: true,
@@ -100,7 +100,7 @@ export default function AgentNeuralCanvas() {
 		scene.add(fillLight);
 
 		// Central Omnidirectional Point Glow
-		const coreLight = new THREE.PointLight(0x0f5e56, 2.8, 8);
+		const coreLight = new THREE.PointLight(0x0f5e56, 2.4, 6);
 		coreLight.position.set(0, 0, 0);
 		scene.add(coreLight);
 
@@ -109,13 +109,13 @@ export default function AgentNeuralCanvas() {
 		scene.add(masterGroup);
 
 		// -------------------------------------------------------------
-		// 1. Central Kinetic Core: Substantial Faceted Polyhedron
+		// 1. Central Kinetic Core: Refined Faceted Polyhedron
 		// -------------------------------------------------------------
 		const coreGroup = new THREE.Group();
 		masterGroup.add(coreGroup);
 
-		// Outer Sculptural Shell: Substantial Dodecahedron with Crisp Flat Shading
-		const outerCoreGeom = new THREE.DodecahedronGeometry(1.65, 0);
+		// Outer Sculptural Shell: Proportional Dodecahedron with Crisp Flat Shading
+		const outerCoreGeom = new THREE.DodecahedronGeometry(1.08, 0);
 		const outerCoreMat = new THREE.MeshStandardMaterial({
 			color: 0x0f5e56, // Deep Teal
 			roughness: 0.18,
@@ -142,7 +142,7 @@ export default function AgentNeuralCanvas() {
 		outerCoreMesh.add(edgeLines);
 
 		// Inner Floating Geometric Kernel (Gold/Amber Octahedron)
-		const innerKernelGeom = new THREE.OctahedronGeometry(0.88, 0);
+		const innerKernelGeom = new THREE.OctahedronGeometry(0.56, 0);
 		const innerKernelMat = new THREE.MeshStandardMaterial({
 			color: 0xc4602a, // Rich Amber
 			roughness: 0.2,
@@ -165,13 +165,13 @@ export default function AgentNeuralCanvas() {
 		innerKernelMesh.add(kernelEdgeLines);
 
 		// -------------------------------------------------------------
-		// 2. Volumetric Mechanical Gimbal Rings (Tangible Cross-Section)
+		// 2. Volumetric Mechanical Gimbal Rings (Proportional Elegance)
 		// -------------------------------------------------------------
 		const ringGroup = new THREE.Group();
 		masterGroup.add(ringGroup);
 
 		// Primary Orbit Gimbal
-		const ring1Geom = new THREE.TorusGeometry(2.35, 0.045, 16, 90);
+		const ring1Geom = new THREE.TorusGeometry(1.68, 0.03, 16, 90);
 		const ring1Mat = new THREE.MeshStandardMaterial({
 			color: 0x5c5852, // Muted slate ink
 			roughness: 0.3,
@@ -184,7 +184,7 @@ export default function AgentNeuralCanvas() {
 		ringGroup.add(ring1Mesh);
 
 		// Secondary Inclined Gimbal (Amber Accent Ring)
-		const ring2Geom = new THREE.TorusGeometry(2.75, 0.035, 16, 90);
+		const ring2Geom = new THREE.TorusGeometry(2.02, 0.024, 16, 90);
 		const ring2Mat = new THREE.MeshStandardMaterial({
 			color: 0xc4602a, // Amber
 			roughness: 0.25,
@@ -217,7 +217,7 @@ export default function AgentNeuralCanvas() {
 			masterGroup.add(podGroup);
 
 			// Chamfered Hardware Pod: Cylinder housing
-			const podHousingGeom = new THREE.CylinderGeometry(0.28, 0.32, 0.28, 12);
+			const podHousingGeom = new THREE.CylinderGeometry(0.22, 0.26, 0.22, 12);
 			const podHousingMat = new THREE.MeshStandardMaterial({
 				color: 0xffffff,
 				roughness: 0.2,
@@ -230,7 +230,7 @@ export default function AgentNeuralCanvas() {
 			podGroup.add(podMesh);
 
 			// Indicator Jewel atop the pod
-			const jewelGeom = new THREE.OctahedronGeometry(0.18, 0);
+			const jewelGeom = new THREE.OctahedronGeometry(0.14, 0);
 			const jewelMat = new THREE.MeshStandardMaterial({
 				color: node.color,
 				roughness: 0.1,
@@ -239,7 +239,7 @@ export default function AgentNeuralCanvas() {
 			});
 			disposables.push(jewelGeom, jewelMat);
 			const jewelMesh = new THREE.Mesh(jewelGeom, jewelMat);
-			jewelMesh.position.set(0, 0.22, 0);
+			jewelMesh.position.set(0, 0.18, 0);
 			podGroup.add(jewelMesh);
 
 			raycastTargets.push({ mesh: podMesh, data: node });
@@ -257,7 +257,7 @@ export default function AgentNeuralCanvas() {
 			masterGroup.add(railLine);
 
 			// Volumetric Kinetic Transaction Packet
-			const packetGeom = new THREE.SphereGeometry(0.1, 12, 12);
+			const packetGeom = new THREE.SphereGeometry(0.075, 12, 12);
 			const packetMat = new THREE.MeshStandardMaterial({
 				color: node.color,
 				roughness: 0.15,
@@ -283,16 +283,16 @@ export default function AgentNeuralCanvas() {
 		const tickPositions = new Float32Array(ticksCount * 3);
 		for (let i = 0; i < ticksCount; i++) {
 			const angle = (i / ticksCount) * Math.PI * 2;
-			const radius = 3.6;
+			const radius = 2.65;
 			tickPositions[i * 3] = Math.cos(angle) * radius;
-			tickPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.4;
+			tickPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.3;
 			tickPositions[i * 3 + 2] = Math.sin(angle) * radius;
 		}
 		const ticksGeom = new THREE.BufferGeometry();
 		ticksGeom.setAttribute('position', new THREE.BufferAttribute(tickPositions, 3));
 		const ticksMat = new THREE.PointsMaterial({
 			color: 0x0f5e56,
-			size: 0.06,
+			size: 0.045,
 			transparent: true,
 			opacity: 0.5,
 		});

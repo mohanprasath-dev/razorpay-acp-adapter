@@ -43,11 +43,11 @@ curl -X POST ${API_BASE_URL}/checkout_sessions \\
   -H "Content-Type: application/json" \\
   -d '{
     "line_items": [{"product_id": "prod_bolt_001", "quantity": 2}],
-    "buyer": {"name": "Aura Agent", "email": "aura@taskdrift.internal"}
+    "buyer": {"name": "Aura Agent", "email": "aura@buyer.internal"}
   }'`;
 
 	const tsQuickstart = `// Autonomous Buyer Agent ACP Client
-import { ACPClient } from '@taskdrift/acp-sdk';
+import { ACPClient } from '@acp/sdk';
 
 const client = new ACPClient({
   baseUrl: '${API_BASE_URL}',
@@ -66,7 +66,7 @@ const products = await client.catalog.search({
 // 3. Create session (unit_price strictly authoritative on server)
 const session = await client.checkout.createSession({
   lineItems: [{ productId: 'prod_bolt_001', quantity: 2 }],
-  buyer: { name: 'Aura Agent', email: 'aura@taskdrift.internal' },
+  buyer: { name: 'Aura Agent', email: 'aura@buyer.internal' },
   idempotencyKey: 'idemp_unique_key_2026'
 });`;
 

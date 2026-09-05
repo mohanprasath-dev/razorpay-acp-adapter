@@ -82,7 +82,7 @@ For complete technical specifications, see [`docs/architecture.md`](docs/archite
 ### 2. Backend Setup
 ```bash
 # Clone the repository
-git clone https://github.com/TaskDrift/razorpay-acp-adapter.git
+git clone https://github.com/mohanprasath-dev/razorpay-acp-adapter.git
 cd razorpay-acp-adapter
 
 # Create & activate virtual environment
@@ -162,6 +162,13 @@ pytest
 See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for step-by-step instructions:
 - **Backend**: Containerized via [`Dockerfile`](Dockerfile) on Google Cloud Run.
 - **Frontend**: Next.js App Router on Vercel.
+
+---
+
+## 👤 Author
+
+**Mohan Prasath**  
+GitHub: [@mohanprasath-dev](https://github.com/mohanprasath-dev)
 
 ---
 

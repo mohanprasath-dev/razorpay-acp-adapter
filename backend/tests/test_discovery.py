@@ -14,7 +14,7 @@ def test_agent_discovery_endpoint():
 	assert data['spec_version'] == '2026-04-17'
 	assert data['payment_provider'] == 'razorpay'
 	assert 'merchant' in data
-	assert data['merchant']['name'] == 'TaskDrift Merchant Store'
+	assert data['merchant']['name'] == 'Razorpay ACP Merchant Store'
 	assert 'endpoints' in data
 	assert data['endpoints']['discovery'] == '/.well-known/agent.json'
 	assert data['endpoints']['catalog'] == '/products'

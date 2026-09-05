@@ -36,7 +36,7 @@ DIM = '\033[2m'
 
 def print_banner():
 	print(f'\n{CYAN}{BOLD}======================================================================={RESET}')
-	print(f'{CYAN}{BOLD}         TaskDrift ACP Adapter — Multi-Agent Concurrency Proof         {RESET}')
+	print(f'{CYAN}{BOLD}         Razorpay ACP Adapter — Multi-Agent Concurrency Proof          {RESET}')
 	print(f'{CYAN}{BOLD}======================================================================={RESET}\n')
 
 

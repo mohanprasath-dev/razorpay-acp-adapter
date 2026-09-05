@@ -78,7 +78,7 @@ def http_request(
 	data: Optional[Dict[str, Any]] = None,
 	headers: Optional[Dict[str, str]] = None
 ) -> Dict[str, Any]:
-	req_headers = {'Content-Type': 'application/json', 'User-Agent': 'TaskDrift-BuyerAgentSim/1.0'}
+	req_headers = {'Content-Type': 'application/json', 'User-Agent': 'Razorpay-BuyerAgentSim/1.0'}
 	if _agent_api_key and (headers is None or 'X-API-Key' not in headers):
 		req_headers['X-API-Key'] = _agent_api_key
 	if headers:
@@ -161,7 +161,7 @@ def run_act_2_happy_path(base_url: str, products: list, pause: float):
 		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
 		'buyer': {
 			'name': 'Aura Autonomous Buyer Agent #42',
-			'email': 'aura.agent@taskdrift.internal'
+			'email': 'aura.agent@buyer.internal'
 		}
 	}
 	res = http_request(f'{base_url}/checkout_sessions', method='POST', data=create_payload)
@@ -288,7 +288,7 @@ def run_act_3_attack_suite(base_url: str, products: list, pause: float):
 	compliant_payload = {
 		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
 		'discount': 50.0,
-		'buyer': {'name': 'Recovered Agent Buyer', 'email': 'recovered@taskdrift.internal'},
+		'buyer': {'name': 'Recovered Agent Buyer', 'email': 'recovered@buyer.internal'},
 		'fulfillment_address': {
 			'line1': 'Recovery Suite 101',
 			'city': 'Mumbai',
@@ -341,7 +341,7 @@ def run_act_4_resilience_and_lifecycle(base_url: str, products: list, pause: flo
 	# Create and complete a session
 	res_c = http_request(f'{base_url}/checkout_sessions', method='POST', data={
 		'line_items': [{'product_id': p1['id'], 'quantity': 1}],
-		'buyer': {'name': 'Refund Buyer', 'email': 'buyer@taskdrift.internal'},
+		'buyer': {'name': 'Refund Buyer', 'email': 'buyer@buyer.internal'},
 		'fulfillment_address': {'line1': '101 Refund Way', 'city': 'Chennai', 'state': 'TN', 'postal_code': '600001', 'country': 'IN'}
 	})
 	sid_c = res_c['data']['id']
@@ -368,7 +368,7 @@ def main():
 	print(f'{BOLD}{MAGENTA}')
 	print("======================================================================")
 	print("       RAZORPAY ACP CHECKOUT ADAPTER -- 4-ACT BUYER AGENT SIMULATOR   ")
-	print("          Track 01: AI Growth & Agentic Commerce | TaskDrift          ")
+	print("          Track 01: AI Growth & Agentic Commerce | Mohan Prasath      ")
 	print("======================================================================")
 	print(f'{RESET}{DIM}Target Rail API: {args.base_url}{RESET}')
 	print(f'{DIM}Protocol Specification: ACP v2026-04-17 | Rail: Razorpay Test Mode{RESET}')

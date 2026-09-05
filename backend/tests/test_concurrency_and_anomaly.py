@@ -60,7 +60,7 @@ def test_burst_session_creation_flags_anomalous():
 	is_anomalous=True and logs a flagged_anomalous AuditEntry.
 	"""
 	reset_anomaly_state_for_test()
-	burst_email = f'burst_agent_{uuid.uuid4().hex[:8]}@taskdrift.internal'
+	burst_email = f'burst_agent_{uuid.uuid4().hex[:8]}@buyer.internal'
 
 	sessions = []
 	for i in range(6):

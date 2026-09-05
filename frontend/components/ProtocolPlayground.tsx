@@ -35,7 +35,7 @@ const SCENARIOS: Scenario[] = [
 			],
 			buyer: {
 				name: 'Aura Autonomous Buyer Agent #42',
-				email: 'aura.agent@taskdrift.internal'
+				email: 'aura.agent@buyer.internal'
 			},
 			fulfillment_address: {
 				line1: 'Prestige Tech Cloud, Block 2',
@@ -72,7 +72,7 @@ const SCENARIOS: Scenario[] = [
 			is_anomalous: false,
 			anomaly_score: 0
 		},
-		curl: `curl -X POST https://api.adapter.taskdrift.com/checkout_sessions/cs_e44bcc71/complete \\
+		curl: `curl -X POST https://api.agentpay-bridge.internal/checkout_sessions/cs_e44bcc71/complete \\
   -H "X-API-Key: acp_agent_8f0a394bc..." \\
   -H "Content-Type: application/json"`
 	},
@@ -115,7 +115,7 @@ const SCENARIOS: Scenario[] = [
 			},
 			notice: 'Client unit_price ignored. Server-authoritative catalog pricing enforced.'
 		},
-		curl: `curl -X POST https://api.adapter.taskdrift.com/checkout_sessions \\
+		curl: `curl -X POST https://api.agentpay-bridge.internal/checkout_sessions \\
   -H "X-API-Key: acp_agent_8f0a394bc..." \\
   -H "Content-Type: application/json" \\
   -d '{"line_items":[{"product_id":"prod_bolt_001","quantity":1,"unit_price":1.0}]}'`
@@ -142,7 +142,7 @@ const SCENARIOS: Scenario[] = [
 			session_id: 'cs_9fe035df86e34b35',
 			status: 'rejected'
 		},
-		curl: `curl -X POST https://api.adapter.taskdrift.com/checkout_sessions/cs_9fe035df \\
+		curl: `curl -X POST https://api.agentpay-bridge.internal/checkout_sessions/cs_9fe035df \\
   -H "X-API-Key: acp_agent_8f0a394bc..." \\
   -H "Content-Type: application/json" \\
   -d '{"discount":375.0}'`
@@ -166,7 +166,7 @@ const SCENARIOS: Scenario[] = [
 			inventory_released: true,
 			timestamp: '2026-09-04T06:30:00.000Z'
 		},
-		curl: `curl -X POST https://api.adapter.taskdrift.com/internal/sweep_expired`
+		curl: `curl -X POST https://api.agentpay-bridge.internal/internal/sweep_expired`
 	}
 ];
 

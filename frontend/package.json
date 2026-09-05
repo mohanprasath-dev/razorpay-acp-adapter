@@ -2,6 +2,7 @@
 	"name": "agentpay-bridge-dashboard",
 	"version": "0.1.0",
 	"private": true,
+	"author": "Mohan Prasath",
 	"scripts": {
 		"dev": "node ./node_modules/next/dist/bin/next dev",
 		"build": "node ./node_modules/next/dist/bin/next build",

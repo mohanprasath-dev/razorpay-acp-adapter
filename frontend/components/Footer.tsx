@@ -95,8 +95,7 @@ export default function Footer() {
 
 				<div className="pt-8 border-t border-[#E8E5DF] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#5C5852] font-medium">
 					<div>
-						Built by <span className="text-[#141210] font-bold">Mohan Prasath</span> @{' '}
-						<span className="text-[#0F5E56] font-bold">TaskDrift</span>
+						Built by <span className="text-[#141210] font-bold">Mohan Prasath</span>
 					</div>
 					<div className="font-mono text-[11px] text-[#5C5852]">
 						ACP Spec Version: 2026-04-17 | Third-Party Adapter

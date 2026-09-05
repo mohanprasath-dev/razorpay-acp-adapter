@@ -12,15 +12,26 @@ app = FastAPI(
 	version=settings.ACP_SPEC_VERSION,
 )
 
+import os
 from backend.middleware.correlation import CorrelationIdMiddleware
 
 # Mount Correlation ID middleware first so all downstream handlers & CORS have correlation headers
 app.add_middleware(CorrelationIdMiddleware)
 
+# Resolve CORS allowed origins from ALLOWED_ORIGINS env var, defaulting to production Vercel and local dev origins
+raw_origins = os.getenv('ALLOWED_ORIGINS', '').strip() or getattr(settings, 'ALLOWED_ORIGINS', '').strip()
+if raw_origins:
+	allowed_origins = [origin.strip() for origin in raw_origins.split(',') if origin.strip()]
+else:
+	allowed_origins = [
+		'https://agentpay-bridge.vercel.app',
+		'http://localhost:3000',
+	]
+
 # Setup CORS for Frontend dashboard
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=['*'],
+	allow_origins=allowed_origins,
 	allow_credentials=True,
 	allow_methods=['*'],
 	allow_headers=['*'],

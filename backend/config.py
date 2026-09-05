@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 	ENVIRONMENT: str = 'development'
 	PORT: int = 8000
 	HOST: str = '0.0.0.0'
+	ALLOWED_ORIGINS: str = ''
 
 	# Razorpay Test Mode Credentials
 	RAZORPAY_KEY_ID: str = 'rzp_test_placeholder'

@@ -12,7 +12,7 @@
 
 | Total Checks | PASS | WARN | FAIL | [NEEDS INPUT] | Overall Status |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| **20** | **19** | **1** | **0** | **0** | **READY FOR SUBMISSION & VIDEO FREEZE** |
+| **20** | **20** | **0** | **0** | **0** | **READY FOR SUBMISSION & VIDEO FREEZE** |
 
 Every check was independently validated by running real HTTP requests against the live production deployment and executing local verification scripts. No historical self-reported results were assumed.
 
@@ -157,10 +157,14 @@ Every check was independently validated by running real HTTP requests against th
 * **Hardcoded Credentials**: Grep for `rzp_live_`, `rzp_test_[a-zA-Z0-9]{14,}`, and `BEGIN PRIVATE KEY` returned zero live secrets.
 * **Client Bundles**: Inspected Vercel production bundles; only public `NEXT_PUBLIC_BACKEND_URL` is included.
 
-### [WARN] 2.6 CORS Configuration
-* **Code Reference**: [`backend/main.py:23`](file:///d:/TaskDrift/razorpay-acp-adapter/backend/main.py#L23)
-* **Finding**: `allow_origins=['*']` with `allow_credentials=True`.
-* **Rationale**: ACP is an open agent protocol intended for arbitrary autonomous buyer agents operating on various domains. For strict production with a known single frontend, this can be scoped via `ALLOWED_ORIGINS`. Documented as intentional for hackathon interoperability.
+### [PASS] 2.6 CORS Configuration Scoped to Explicit Allowlist
+* **Code Reference**: [`backend/main.py:21-38`](backend/main.py#L21-L38)
+* **Implementation**: Reads comma-separated origins from `ALLOWED_ORIGINS` env var, with fallback defaults to `https://agentpay-bridge.vercel.app` and `http://localhost:3000`. Preserves `allow_credentials=True`.
+* **Evidence**:
+  - Preflight from `https://agentpay-bridge.vercel.app` $\rightarrow$ `HTTP 200`, `Access-Control-Allow-Origin: https://agentpay-bridge.vercel.app`, `Access-Control-Allow-Credentials: true`.
+  - Preflight from `http://localhost:3000` $\rightarrow$ `HTTP 200`, `Access-Control-Allow-Origin: http://localhost:3000`.
+  - Preflight from unauthorized origin `https://evil.example.com` $\rightarrow$ `HTTP 400`, `Access-Control-Allow-Origin: None` (Rejected).
+  - Dynamic parsing from `ALLOWED_ORIGINS="https://custom.agent.domain, https://partner.agent.domain"` verified with test client.
 
 ### [PASS] 2.7 Endpoint Authentication Enforcement
 * **Test**: Dispatched unauthenticated `POST /checkout_sessions`.
@@ -177,7 +181,7 @@ Every check was independently validated by running real HTTP requests against th
 ## 3. Data Integrity
 
 ### [PASS] 3.1 Immutable Append-Only Audit Records
-* **Code Reference**: [`backend/services/audit.py`](file:///d:/TaskDrift/razorpay-acp-adapter/backend/services/audit.py#L13-L45)
+* **Code Reference**: [`backend/services/audit.py`](backend/services/audit.py#L13-L45)
 * **Evidence**:
   - `record_audit_entry()` generates unique `audit_{uuid}` IDs and writes append-only documents to Firestore `audit_entries`.
   - Zero update or delete operations exist in the audit service module.
@@ -196,14 +200,14 @@ Every check was independently validated by running real HTTP requests against th
 
 ## 4. Branding Cleanup Verification
 
-### [PASS] 4.1 Zero TaskDrift References Across Codebase
-* **Command**: `git grep -i "taskdrift"`
+### [PASS] 4.1 Zero Agency Branding References Across Codebase
+* **Check**: Git grep scan for legacy agency branding across all files
 * **Result**: Exit code 1 (0 matches across all tracked files).
-* **Regex Scan**: Full workspace search for `taskdrift`, `taskdrift.in`, `info.taskdrift@gmail.com` returned 0 results.
+* **Regex Scan**: Full workspace search for agency identifiers returned 0 results.
 
 ### [PASS] 4.2 Visual UI & Footer Branding
 * **Landing Page & Dashboard**: Inspected header, hero, sandbox, FSM diagrams, and footer.
-* **Footer Reference**: `Built by Mohan Prasath` ([`frontend/components/Footer.tsx:98`](file:///d:/TaskDrift/razorpay-acp-adapter/frontend/components/Footer.tsx#L98)). Zero agency branding, logos, or references exist.
+* **Footer Reference**: `Built by Mohan Prasath` ([`frontend/components/Footer.tsx:98`](frontend/components/Footer.tsx#L98)). Zero agency branding, logos, or references exist.
 
 ### [PASS] 4.3 Metadata & Commit Author Cleanliness
 * **`frontend/package.json`**: `"author": "Mohan Prasath"`
@@ -240,8 +244,8 @@ Every check was independently validated by running real HTTP requests against th
 To ensure judges landing cold on the live dashboard can test the system in under 60 seconds without reading external docs, the **Judge & Evaluator Testing Guide** has been built directly into the dashboard.
 
 ### Component Architecture
-* **File**: [`frontend/components/JudgeGuideCard.tsx`](file:///d:/TaskDrift/razorpay-acp-adapter/frontend/components/JudgeGuideCard.tsx)
-* **Integration**: Mounted prominently in [`frontend/app/dashboard/page.tsx`](file:///d:/TaskDrift/razorpay-acp-adapter/frontend/app/dashboard/page.tsx#L348) above the metrics row.
+* **File**: [`frontend/components/JudgeGuideCard.tsx`](frontend/components/JudgeGuideCard.tsx)
+* **Integration**: Mounted prominently in [`frontend/app/dashboard/page.tsx`](frontend/app/dashboard/page.tsx#L348) above the metrics row.
 
 ### What the Guide Provides to Judges
 1. **Plain-English Summary**: Explains what AgentPay Bridge does in 2 sentences (ACP checkout safety adapter translating agent intents to Razorpay orders while enforcing 50% discount caps and 30-min holds).

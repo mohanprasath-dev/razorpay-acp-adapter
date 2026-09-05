@@ -21,11 +21,13 @@ import Footer from '@/components/Footer';
 import AgentNeuralCanvas from '@/components/AgentNeuralCanvas';
 import ProtocolPlayground from '@/components/ProtocolPlayground';
 import ArchitectureSection from '@/components/ArchitectureSection';
+import TryDemoModal from '@/components/TryDemoModal';
 import { API_BASE_URL } from '@/lib/api';
 
 export default function LandingPage() {
 	const [activeQuickstartTab, setActiveQuickstartTab] = useState<'curl' | 'ts'>('curl');
 	const [copiedSnippet, setCopiedSnippet] = useState(false);
+	const [demoModalOpen, setDemoModalOpen] = useState(false);
 
 	const curlQuickstart = `# 1. Register Autonomous Buyer Agent
 curl -X POST ${API_BASE_URL}/agents/register \\
@@ -113,23 +115,31 @@ const session = await client.checkout.createSession({
 								guardrails, 30-min inventory soft-holds, and zero-hallucination checkouts.
 							</p>
 
-							{/* Dual CTAs in Deep Teal & Neutral Frame */}
+							{/* CTAs in Deep Teal & Neutral Frame with Interactive Demo Button */}
 							<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
-								<Link
-									href="/dashboard"
+								<button
+									onClick={() => setDemoModalOpen(true)}
 									className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-white bg-[#0F5E56] hover:bg-[#09433D] transition-all shadow-sm active:scale-[0.98]"
 								>
-									<Activity className="w-4 h-4 text-[#E6F0EE]" />
-									<span>Launch Live Dashboard</span>
-									<ArrowRight className="w-4 h-4 text-[#E6F0EE]" />
+									<Zap className="w-4 h-4 text-[#34D399]" />
+									<span>Try Interactive Demo</span>
+								</button>
+
+								<Link
+									href="/dashboard"
+									className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#141210] bg-white hover:bg-[#F4F1EC] border border-[#E8E5DF] transition-all shadow-sm"
+								>
+									<Activity className="w-4 h-4 text-[#0F5E56]" />
+									<span>Live Dashboard</span>
+									<ArrowRight className="w-4 h-4 text-[#5C5852]" />
 								</Link>
 
 								<a
 									href="#playground"
-									className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#141210] bg-white hover:bg-[#F4F1EC] border border-[#E8E5DF] transition-all shadow-sm"
+									className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#5C5852] hover:text-[#141210] hover:bg-[#F4F1EC] transition-all"
 								>
 									<Terminal className="w-4 h-4 text-[#0F5E56]" />
-									<span>Protocol Sandbox</span>
+									<span>Sandbox</span>
 								</a>
 							</div>
 
@@ -681,6 +691,12 @@ const session = await client.checkout.createSession({
 
 			{/* Technical Footer */}
 			<Footer />
+
+			{/* Interactive Try Demo Modal */}
+			<TryDemoModal
+				isOpen={demoModalOpen}
+				onClose={() => setDemoModalOpen(false)}
+			/>
 		</div>
 	);
 }

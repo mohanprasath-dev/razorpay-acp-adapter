@@ -3,11 +3,15 @@
 > **ACP-compliant checkout adapter for autonomous AI buyer agents.**  
 > *Enforces server-authoritative catalog pricing, deterministic guardrails, 30-min inventory soft-holds, and immutable audit trails. Payment rail: Razorpay Orders API.*
 
+[![Live App](https://img.shields.io/badge/Live%20App-agentpay--bridge.vercel.app-0F5E56?style=for-the-badge&logo=vercel)](https://agentpay-bridge.vercel.app/)
 [![CI Tests](https://img.shields.io/badge/pytest-91%20passed-emerald.svg)](backend/tests)
 [![ACP Spec](https://img.shields.io/badge/ACP%20Spec-v2026--04--17-0F5E56.svg)](docs/architecture.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Framework](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com)
 [![Frontend](https://img.shields.io/badge/Next.js-14%20(App%20Router)-black.svg)](https://nextjs.org)
+
+> 🌐 **Live Web Application & Interactive Console**: **[https://agentpay-bridge.vercel.app/](https://agentpay-bridge.vercel.app/)**  
+> ⚡ **Zero-Terminal Evaluation**: Test real ACP checkout flows, price tampering defenses, and idempotency replays directly with 1-click test buttons in the browser.
 
 ---
 
@@ -74,6 +78,8 @@ For complete technical specifications, see [`docs/architecture.md`](docs/archite
 ---
 
 ## 🚀 Quick Start (Local Setup)
+
+> 💡 **Try the Live System Instantly**: You do not need to clone or configure anything locally to evaluate the system. Visit the live deployment at **[https://agentpay-bridge.vercel.app/](https://agentpay-bridge.vercel.app/)** and click **"⚡ Try Demo"** or open the **Live Dashboard** to trigger autonomous buyer scenarios against the adapter in real time.
 
 ### 1. Prerequisites
 - Python 3.10+
@@ -159,9 +165,10 @@ pytest
 
 ## 📦 Deployment
 
-See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for step-by-step instructions:
-- **Backend**: Containerized via [`Dockerfile`](Dockerfile) on Google Cloud Run.
-- **Frontend**: Next.js App Router on Vercel.
+- **Live Production URL**: **[https://agentpay-bridge.vercel.app/](https://agentpay-bridge.vercel.app/)**
+- **Architecture & Guide**: See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for step-by-step instructions:
+  - **Backend**: Containerized via [`Dockerfile`](Dockerfile) on Google Cloud Run.
+  - **Frontend**: Next.js App Router deployed on Vercel.
 
 ---
 

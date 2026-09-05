@@ -18,7 +18,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Aura Agent',
 		role: 'Autonomous Buyer Intent',
 		color: 0x0f5e56, // Deep Teal
-		pos: [2.25, 0.95, 0.35],
+		pos: [2.05, 0.85, 0.3],
 		status: 'DISPATCHING',
 	},
 	{
@@ -26,7 +26,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Guardrail Mutex',
 		role: 'Deterministic Rule Engine',
 		color: 0xc4602a, // Rich Amber
-		pos: [-2.15, -0.75, 0.5],
+		pos: [-1.95, -0.7, 0.35],
 		status: 'ENFORCING',
 	},
 	{
@@ -34,7 +34,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Stock Lock',
 		role: '30-Min TTL Soft-Hold',
 		color: 0x3d7068, // Mineral Teal
-		pos: [1.55, -1.55, -0.7],
+		pos: [1.4, -1.4, -0.5],
 		status: 'RESERVED',
 	},
 	{
@@ -42,7 +42,7 @@ const NODES_METADATA: NodeInfo[] = [
 		title: 'Settlement Rail',
 		role: 'Razorpay Orders API',
 		color: 0x0f5e56, // Deep Teal
-		pos: [-1.75, 1.55, -0.5],
+		pos: [-1.55, 1.4, -0.35],
 		status: 'SYNCHRONIZED',
 	},
 ];
@@ -109,13 +109,13 @@ export default function AgentNeuralCanvas() {
 		scene.add(masterGroup);
 
 		// -------------------------------------------------------------
-		// 1. Central Kinetic Core: Refined Faceted Polyhedron
+		// 1. Central Kinetic Core: Refined Faceted Polyhedron (Compact & Sculptural)
 		// -------------------------------------------------------------
 		const coreGroup = new THREE.Group();
 		masterGroup.add(coreGroup);
 
 		// Outer Sculptural Shell: Proportional Dodecahedron with Crisp Flat Shading
-		const outerCoreGeom = new THREE.DodecahedronGeometry(1.08, 0);
+		const outerCoreGeom = new THREE.DodecahedronGeometry(0.58, 0);
 		const outerCoreMat = new THREE.MeshStandardMaterial({
 			color: 0x0f5e56, // Deep Teal
 			roughness: 0.18,
@@ -133,7 +133,7 @@ export default function AgentNeuralCanvas() {
 		const edgesGeom = new THREE.EdgesGeometry(outerCoreGeom);
 		const edgesMat = new THREE.LineBasicMaterial({
 			color: 0x141210, // Near-black crisp ink bevels
-			linewidth: 2,
+			linewidth: 1.5,
 			transparent: true,
 			opacity: 0.55,
 		});
@@ -142,7 +142,7 @@ export default function AgentNeuralCanvas() {
 		outerCoreMesh.add(edgeLines);
 
 		// Inner Floating Geometric Kernel (Gold/Amber Octahedron)
-		const innerKernelGeom = new THREE.OctahedronGeometry(0.56, 0);
+		const innerKernelGeom = new THREE.OctahedronGeometry(0.28, 0);
 		const innerKernelMat = new THREE.MeshStandardMaterial({
 			color: 0xc4602a, // Rich Amber
 			roughness: 0.2,
@@ -165,13 +165,13 @@ export default function AgentNeuralCanvas() {
 		innerKernelMesh.add(kernelEdgeLines);
 
 		// -------------------------------------------------------------
-		// 2. Volumetric Mechanical Gimbal Rings (Proportional Elegance)
+		// 2. Volumetric Mechanical Gimbal Rings (Sleek, Slender, Proportional)
 		// -------------------------------------------------------------
 		const ringGroup = new THREE.Group();
 		masterGroup.add(ringGroup);
 
-		// Primary Orbit Gimbal
-		const ring1Geom = new THREE.TorusGeometry(1.68, 0.03, 16, 90);
+		// Primary Orbit Gimbal (Slender Slate Ring)
+		const ring1Geom = new THREE.TorusGeometry(0.92, 0.015, 16, 100);
 		const ring1Mat = new THREE.MeshStandardMaterial({
 			color: 0x5c5852, // Muted slate ink
 			roughness: 0.3,
@@ -184,7 +184,7 @@ export default function AgentNeuralCanvas() {
 		ringGroup.add(ring1Mesh);
 
 		// Secondary Inclined Gimbal (Amber Accent Ring)
-		const ring2Geom = new THREE.TorusGeometry(2.02, 0.024, 16, 90);
+		const ring2Geom = new THREE.TorusGeometry(1.18, 0.012, 16, 100);
 		const ring2Mat = new THREE.MeshStandardMaterial({
 			color: 0xc4602a, // Amber
 			roughness: 0.25,
@@ -283,18 +283,18 @@ export default function AgentNeuralCanvas() {
 		const tickPositions = new Float32Array(ticksCount * 3);
 		for (let i = 0; i < ticksCount; i++) {
 			const angle = (i / ticksCount) * Math.PI * 2;
-			const radius = 2.65;
+			const radius = 1.75;
 			tickPositions[i * 3] = Math.cos(angle) * radius;
-			tickPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.3;
+			tickPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.25;
 			tickPositions[i * 3 + 2] = Math.sin(angle) * radius;
 		}
 		const ticksGeom = new THREE.BufferGeometry();
 		ticksGeom.setAttribute('position', new THREE.BufferAttribute(tickPositions, 3));
 		const ticksMat = new THREE.PointsMaterial({
 			color: 0x0f5e56,
-			size: 0.045,
+			size: 0.032,
 			transparent: true,
-			opacity: 0.5,
+			opacity: 0.45,
 		});
 		disposables.push(ticksGeom, ticksMat);
 		const tickPoints = new THREE.Points(ticksGeom, ticksMat);

@@ -18,9 +18,15 @@ import {
 	AlertTriangle,
 	ExternalLink,
 	Home,
+	Play,
+	ShieldAlert,
+	Zap,
 } from 'lucide-react';
 import { CheckoutSession, AuditEntry } from '@/lib/types';
 import { fetchSessions, fetchGlobalAudit, checkBackendHealth, API_BASE_URL } from '@/lib/api';
+import TryDemoModal from '@/components/TryDemoModal';
+import JudgeGuideCard from '@/components/JudgeGuideCard';
+import { runHappyPathDemo, runViolationDemo, runIdempotencyDemo, SimResult } from '@/lib/demoSimulator';
 
 export default function DashboardPage() {
 	const [sessions, setSessions] = useState<CheckoutSession[]>([]);
@@ -31,6 +37,9 @@ export default function DashboardPage() {
 	const [searchQuery, setSearchQuery] = useState<string>('');
 	const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 	const [recentSessionIds, setRecentSessionIds] = useState<Set<string>>(new Set());
+	const [demoModalOpen, setDemoModalOpen] = useState<boolean>(false);
+	const [quickRunning, setQuickRunning] = useState<string | null>(null);
+	const [quickNotice, setQuickNotice] = useState<{ type: 'success' | 'violation' | 'info'; text: string } | null>(null);
 
 	const loadData = async () => {
 		try {
@@ -81,6 +90,47 @@ export default function DashboardPage() {
 			s.payment_provider?.razorpay_order_id?.toLowerCase().includes(searchQuery.toLowerCase());
 		return matchesStatus && matchesSearch;
 	});
+
+	const handleQuickRun = async (scenario: 'happy_path' | 'violation' | 'idempotency') => {
+		setQuickRunning(scenario);
+		setQuickNotice(null);
+		try {
+			let result: SimResult;
+			if (scenario === 'happy_path') {
+				result = await runHappyPathDemo(undefined, 250);
+				if (result.success) {
+					setQuickNotice({
+						type: 'success',
+						text: `Happy Path completed! Razorpay Order created: ${result.razorpayOrderId} (${result.sessionId})`,
+					});
+				}
+			} else if (scenario === 'violation') {
+				result = await runViolationDemo(undefined, 250);
+				if (result.success) {
+					setQuickNotice({
+						type: 'violation',
+						text: `Rogue attack intercepted! Price tampering neutralized, 75% discount halted with HTTP 400 rejection.`,
+					});
+				}
+			} else {
+				result = await runIdempotencyDemo(undefined, 250);
+				if (result.success) {
+					setQuickNotice({
+						type: 'info',
+						text: `Idempotency verified! Duplicate request safely returned cached session with 0 duplicate charges.`,
+					});
+				}
+			}
+			await loadData();
+			if (result.sessionId) {
+				setRecentSessionIds(new Set([result.sessionId]));
+			}
+		} catch (err: any) {
+			setQuickNotice({ type: 'violation', text: `Test error: ${err.message}` });
+		} finally {
+			setQuickRunning(null);
+		}
+	};
 
 	// Metrics
 	const totalSessions = sessions.length;
@@ -204,7 +254,100 @@ export default function DashboardPage() {
 			</header>
 
 			{/* Main Grid */}
-			<main className="max-w-7xl mx-auto pt-8 space-y-8">
+			<main className="max-w-7xl mx-auto pt-8 space-y-6">
+				{/* 1-Click Interactive Demo Action Bar for Judges & Evaluators */}
+				<div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#C5D8D4] shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+					<div className="space-y-1">
+						<div className="flex items-center gap-2">
+							<span className="w-2 h-2 rounded-full bg-[#0F5E56] animate-pulse"></span>
+							<span className="font-mono text-[11px] font-bold uppercase tracking-wider text-[#0F5E56]">
+								1-Click Protocol Test Suite // Zero Terminal Required
+							</span>
+						</div>
+						<p className="text-xs text-[#5C5852]">
+							Trigger real autonomous AI buyer agent transactions against the adapter to verify guardrails and live Razorpay Orders.
+						</p>
+					</div>
+
+					<div className="flex flex-wrap items-center gap-2.5">
+						<button
+							onClick={() => handleQuickRun('happy_path')}
+							disabled={quickRunning !== null}
+							className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-[#0F5E56] hover:bg-[#09433D] shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+						>
+							{quickRunning === 'happy_path' ? (
+								<RefreshCw className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<Play className="w-3.5 h-3.5 fill-current" />
+							)}
+							<span>▶ Happy Path (Razorpay)</span>
+						</button>
+
+						<button
+							onClick={() => handleQuickRun('violation')}
+							disabled={quickRunning !== null}
+							className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-[#C4602A] bg-[#F9ECE5] hover:bg-[#F3DDD2] border border-[#E8C2AF] shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+						>
+							{quickRunning === 'violation' ? (
+								<RefreshCw className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<ShieldAlert className="w-3.5 h-3.5 text-[#C4602A]" />
+							)}
+							<span>🛡 Test Attack &amp; Guardrails</span>
+						</button>
+
+						<button
+							onClick={() => handleQuickRun('idempotency')}
+							disabled={quickRunning !== null}
+							className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-[#5C5852] bg-[#FAF9F6] hover:bg-[#F4F1EC] border border-[#E8E5DF] shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+						>
+							{quickRunning === 'idempotency' ? (
+								<RefreshCw className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<RefreshCw className="w-3.5 h-3.5 text-[#5C5852]" />
+							)}
+							<span>⚡ Test Idempotency</span>
+						</button>
+
+						<button
+							onClick={() => setDemoModalOpen(true)}
+							className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-[#141210] bg-white hover:bg-[#F4F1EC] border border-[#E8E5DF] shadow-sm transition-all whitespace-nowrap"
+						>
+							<Terminal className="w-3.5 h-3.5 text-[#0F5E56]" />
+							<span>Interactive Console</span>
+						</button>
+					</div>
+				</div>
+
+				{/* Inline Notification Banner for Quick Tests */}
+				{quickNotice && (
+					<div
+						className={`p-3.5 rounded-xl border text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200 ${
+							quickNotice.type === 'success'
+								? 'bg-[#E6F0EE] border-[#C5D8D4] text-[#0F5E56]'
+								: quickNotice.type === 'violation'
+								? 'bg-[#F9ECE5] border-[#E8C2AF] text-[#C4602A]'
+								: 'bg-[#FAF9F6] border-[#E8E5DF] text-[#141210]'
+						}`}
+					>
+						<div className="flex items-center gap-2 font-medium">
+							{quickNotice.type === 'success' && <CheckCircle2 className="w-4 h-4 text-[#0F5E56]" />}
+							{quickNotice.type === 'violation' && <ShieldAlert className="w-4 h-4 text-[#C4602A]" />}
+							{quickNotice.type === 'info' && <RefreshCw className="w-4 h-4 text-[#5C5852]" />}
+							<span>{quickNotice.text}</span>
+						</div>
+						<button
+							onClick={() => setQuickNotice(null)}
+							className="text-xs opacity-70 hover:opacity-100 font-bold px-2 py-0.5"
+						>
+							✕
+						</button>
+					</div>
+				)}
+
+				{/* Judge & Evaluator Testing Guide */}
+				<JudgeGuideCard />
+
 				{/* Metrics Row */}
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 					<div className="p-5 rounded-xl bg-white border border-[#E8E5DF] shadow-bridge">
@@ -472,6 +615,16 @@ export default function DashboardPage() {
 					</div>
 				</div>
 			</main>
+
+			{/* Interactive Try Demo Modal */}
+			<TryDemoModal
+				isOpen={demoModalOpen}
+				onClose={() => setDemoModalOpen(false)}
+				onSessionCreated={async (sid) => {
+					await loadData();
+					setRecentSessionIds(new Set([sid]));
+				}}
+			/>
 		</div>
 	);
 }
